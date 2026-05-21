@@ -108,6 +108,9 @@ function startQuestion(roomCode) {
     text: question.text,
     options,
     timeLimit: totalTime,
+    // Never send image data over socket — only flag and index
+    hasImage: !!question.hasImage,
+    imageIndex: question.imageIndex ?? room.currentQuestionIndex,
   });
 
   // Server-controlled timer
