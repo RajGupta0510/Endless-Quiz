@@ -1,21 +1,39 @@
 const express = require("express");
-const http = require("http");
+const http    = require("http");
 const { Server } = require("socket.io");
-const cors = require("cors");
+const cors    = require("cors");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "20mb" }));   // allow image uploads up to 20 MB
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
+  maxHttpBufferSize: 25e6,   // 25 MB — enough for compressed images
 });
 
-// ── In-memory store ──────────────────────────────────────────────────────────
-const rooms = {};
+// ── In-memory stores ───────────────────────────────────────────────────────────
+const rooms  = {};
 
-function generateRoomCode() {
+// Images stored as: imageStore["ROOMCODE_qi"] = { mimeType, data (base64) }
+const imageStore = {};
+
+// ── Image HTTP endpoint — all players fetch images via this URL ────────────────
+// GET /img/:roomCode/:qi  → returns the image as binary
+app.get("/img/:roomCode/:qi", (req, res) => {
+  const key   = `${req.params.roomCode}_${req.params.qi}`;
+  const entry = imageStore[key];
+  if (!entry) return res.status(404).send("Image not found");
+  const buf = Buffer.from(entry.data, "base64");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Content-Type", entry.mimeType);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(buf);
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function generateCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
@@ -26,284 +44,267 @@ function getLeaderboard(room) {
     .map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
-function clearRoomTimer(room) {
-  if (room.timerInterval) {
-    clearInterval(room.timerInterval);
-    room.timerInterval = null;
-  }
+function clearTimers(room) {
+  if (room.questionTimer)  { clearInterval(room.questionTimer);  room.questionTimer  = null; }
+  if (room.phaseTimeout)   { clearTimeout(room.phaseTimeout);    room.phaseTimeout   = null; }
+  if (room.countdownTimer) { clearInterval(room.countdownTimer); room.countdownTimer = null; }
 }
 
+// ── Build the image URL for a question ────────────────────────────────────────
+// Uses a relative path — the client prepends its own SERVER_URL so it works
+// on localhost AND on local network (192.168.x.x) without hardcoding the IP.
+function imageUrl(roomCode, qi) {
+  const key = `${roomCode}_${qi}`;
+  return imageStore[key] ? `/img/${roomCode}/${qi}` : null;
+}
+
+// ── Phase: reveal correct answer → leaderboard → auto-next ────────────────────
 function endQuestion(roomCode) {
   const room = rooms[roomCode];
-  if (!room) return;
-  clearRoomTimer(room);
+  if (!room || room.state === "result") return;
+  clearTimers(room);
 
-  const question = room.questions[room.currentQuestionIndex];
+  const question      = room.questions[room.currentQuestionIndex];
   const correctAnswer = question.correctAnswer;
+  const isLast        = room.currentQuestionIndex >= room.questions.length - 1;
+  const qType         = question.qType || "mcq";
+  const isCorrect     = (answer) => {
+    if (!answer) return false;
+    if (qType === "typed" || qType === "fillinblank") {
+      // Case-insensitive, trimmed comparison
+      return answer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+    }
+    if (qType === "reorder") {
+      // Answer is submitted as items joined by "|||" separator
+      // Compare against the correct sequence (also joined)
+      const correctSeq = (question.reorderItems || []).join("|||");
+      return answer.trim() === correctSeq.trim();
+    }
+    return answer === correctAnswer;
+  };
 
-  // Calculate scores for this round
+  // Score calculation
   const roundResults = {};
   Object.entries(room.players).forEach(([id, player]) => {
     let pointsEarned = 0;
-    if (player.hasAnswered && player.answer === correctAnswer) {
-      const basePoints = 1000;
-      const totalTime = question.timeLimit;
-      pointsEarned = Math.round(basePoints * (player.timeLeft / totalTime));
+    if (player.hasAnswered && isCorrect(player.answer)) {
+      pointsEarned = Math.round(1000 * (player.timeLeft / question.timeLimit));
       player.score += pointsEarned;
     }
     roundResults[id] = {
-      name: player.name,
-      answer: player.answer,
-      correct: player.answer === correctAnswer,
-      pointsEarned,
-      totalScore: player.score,
+      name: player.name, answer: player.answer,
+      correct: isCorrect(player.answer),
+      pointsEarned, totalScore: player.score,
     };
   });
 
   room.state = "result";
 
+  // Broadcast correct answer + correctOrder (for reorder type) to ALL players simultaneously
   io.to(roomCode).emit("question_result", {
     correctAnswer,
     results: roundResults,
     questionText: question.text,
+    correctOrder: question.reorderItems || [],  // only used by reorder type, safe to send now
   });
 
-  // After 3s show leaderboard
-  setTimeout(() => {
+  // After 3s: leaderboard
+  room.phaseTimeout = setTimeout(() => {
     if (!rooms[roomCode]) return;
-    const lb = getLeaderboard(room);
     room.state = "leaderboard";
     io.to(roomCode).emit("leaderboard_update", {
-      leaderboard: lb,
-      isLast: room.currentQuestionIndex >= room.questions.length - 1,
+      leaderboard: getLeaderboard(room), isLast,
     });
+
+    if (isLast) {
+      // End quiz after 6s
+      room.phaseTimeout = setTimeout(() => {
+        if (!rooms[roomCode]) return;
+        room.state = "finished";
+        io.to(roomCode).emit("quiz_finished", { leaderboard: getLeaderboard(room) });
+        // Clean up images for this room
+        Object.keys(imageStore).forEach(k => {
+          if (k.startsWith(roomCode + "_")) delete imageStore[k];
+        });
+      }, 6000);
+    } else {
+      // Auto-advance: countdown 5 → 1 → next question
+      let countdown = 5;
+      io.to(roomCode).emit("next_question_countdown", { countdown });
+      room.countdownTimer = setInterval(() => {
+        if (!rooms[roomCode]) return;
+        countdown -= 1;
+        if (countdown > 0) {
+          io.to(roomCode).emit("next_question_countdown", { countdown });
+        } else {
+          clearInterval(room.countdownTimer);
+          room.countdownTimer = null;
+          room.currentQuestionIndex += 1;
+          startQuestion(roomCode);
+        }
+      }, 1000);
+    }
   }, 3000);
 }
 
+// ── Phase: broadcast question + start server timer ─────────────────────────────
 function startQuestion(roomCode) {
   const room = rooms[roomCode];
   if (!room) return;
+  clearTimers(room);
 
-  const question = room.questions[room.currentQuestionIndex];
-  const totalTime = question.timeLimit;
+  const qi       = room.currentQuestionIndex;
+  const question = room.questions[qi];
 
-  // Reset per-question player state
-  Object.values(room.players).forEach((p) => {
-    p.hasAnswered = false;
-    p.answer = null;
-    p.timeLeft = null;
+  Object.values(room.players).forEach(p => {
+    p.hasAnswered = false; p.answer = null; p.timeLeft = null;
   });
 
-  room.state = "question";
-  room.timeRemaining = totalTime;
+  room.state         = "question";
+  room.timeRemaining = question.timeLimit;
 
-  // Shuffle options before sending
-  const options = [...question.incorrectAnswers, question.correctAnswer].sort(
-    () => Math.random() - 0.5
-  );
+  const qType   = question.qType || "mcq";
+
+  // Build options per question type
+  let options = [];
+  if (qType === "mcq") {
+    options = [...question.incorrectAnswers, question.correctAnswer]
+      .sort(() => Math.random() - 0.5);
+  } else if (qType === "reorder") {
+    // Shuffle the correct sequence so player must reorder them
+    options = [...question.reorderItems].sort(() => Math.random() - 0.5);
+  }
+  // "typed" and "fillinblank" send no options — player types freely
+
+  // Build image URL — all players can fetch this directly
+  const imgUrl = imageUrl(roomCode, qi);
 
   io.to(roomCode).emit("new_question", {
-    questionIndex: room.currentQuestionIndex,
+    questionIndex:  qi,
     totalQuestions: room.questions.length,
-    text: question.text,
-    options,
-    timeLimit: totalTime,
-    // Never send image data over socket — only flag and index
-    hasImage: !!question.hasImage,
-    imageIndex: question.imageIndex ?? room.currentQuestionIndex,
+    text:           question.text,
+    options,          // shuffled: MCQ options OR reorder items scrambled for player
+    timeLimit:      question.timeLimit,
+    imageUrl:       imgUrl,
+    qType,
+    // NOTE: correctOrder is NOT sent here — it would reveal the answer.
+    // It is sent after the timer in question_result.
   });
 
-  // Server-controlled timer
-  room.timerInterval = setInterval(() => {
+  room.questionTimer = setInterval(() => {
     if (!rooms[roomCode]) return;
-    room.timeRemaining -= 1;
+    room.timeRemaining = Math.max(0, room.timeRemaining - 1);
     io.to(roomCode).emit("timer_update", { timeRemaining: room.timeRemaining });
-
-    if (room.timeRemaining <= 0) {
-      endQuestion(roomCode);
-    }
+    if (room.timeRemaining <= 0) endQuestion(roomCode);
   }, 1000);
 }
 
-// ── Socket events ────────────────────────────────────────────────────────────
-io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+// ── Socket events ──────────────────────────────────────────────────────────────
+io.on("connection", socket => {
+  console.log("+ connected:", socket.id);
 
-  // HOST: Create room
+  // HOST: create room
   socket.on("create_room", ({ hostName, questions }) => {
-    const roomCode = generateRoomCode();
-
+    const roomCode = generateCode();
     rooms[roomCode] = {
-      hostId: socket.id,
-      hostName,
-      players: {},
-      questions: questions || [],
-      currentQuestionIndex: 0,
-      state: "lobby",
-      timerInterval: null,
+      hostId: socket.id, hostName,
+      players: {}, questions: questions || [],
+      currentQuestionIndex: 0, state: "lobby",
       timeRemaining: 0,
+      questionTimer: null, phaseTimeout: null, countdownTimer: null,
     };
-
     socket.join(roomCode);
     socket.roomCode = roomCode;
-    socket.isHost = true;
-
-    socket.emit("room_created", {
-      roomCode,
-      inviteLink: `${roomCode}`,
-    });
-
+    socket.isHost   = true;
+    socket.emit("room_created", { roomCode });
     console.log(`Room ${roomCode} created by ${hostName}`);
   });
 
-  // PLAYER: Join room
+  // HOST: upload image for a specific question
+  // Called after create_room, before start_quiz
+  // payload: { roomCode, questionIndex, mimeType, data (base64 string) }
+  socket.on("upload_image", ({ roomCode, questionIndex, mimeType, data }) => {
+    const room = rooms[roomCode];
+    if (!room || room.hostId !== socket.id) return;
+    if (!data || !mimeType) return;
+
+    const key = `${roomCode}_${questionIndex}`;
+    imageStore[key] = { mimeType, data };
+    console.log(`Image stored: ${key} (${Math.round(data.length * .75 / 1024)} KB)`);
+
+    // Acknowledge success back to host
+    socket.emit("image_uploaded", { questionIndex, url: imageUrl(roomCode, questionIndex) });
+  });
+
+  // PLAYER: join room
   socket.on("join_room", ({ roomCode, playerName }) => {
     const room = rooms[roomCode];
-    if (!room) {
-      socket.emit("error", { message: "Room not found" });
-      return;
-    }
-    if (room.state !== "lobby") {
-      socket.emit("error", { message: "Game already in progress" });
-      return;
-    }
+    if (!room) { socket.emit("error", { message: "Room not found. Check your code." }); return; }
+    if (room.state !== "lobby") { socket.emit("error", { message: "Game already started." }); return; }
 
-    room.players[socket.id] = {
-      name: playerName,
-      score: 0,
-      hasAnswered: false,
-      answer: null,
-      timeLeft: null,
-    };
-
+    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null };
     socket.join(roomCode);
     socket.roomCode = roomCode;
 
-    // Notify all in room
-    io.to(roomCode).emit("player_joined", {
-      players: Object.entries(room.players).map(([id, p]) => ({
-        id,
-        name: p.name,
-        score: p.score,
-      })),
-    });
-
+    const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score }));
+    io.to(roomCode).emit("player_joined", { players: playerList });
     socket.emit("join_success", { roomCode, playerName });
-    console.log(`${playerName} joined room ${roomCode}`);
+    console.log(`${playerName} joined ${roomCode}`);
   });
 
-  // HOST: Start quiz
+  // HOST: start quiz
   socket.on("start_quiz", ({ roomCode }) => {
     const room = rooms[roomCode];
-    if (!room) return;
-    if (room.hostId !== socket.id) {
-      socket.emit("error", { message: "Only host can start" });
-      return;
-    }
+    if (!room || room.hostId !== socket.id) return;
     if (room.questions.length === 0) {
-      socket.emit("error", { message: "No questions added" });
-      return;
+      socket.emit("error", { message: "Add at least one question first." }); return;
     }
-
     room.state = "playing";
     room.currentQuestionIndex = 0;
-
-    // Reset all scores
-    Object.values(room.players).forEach((p) => {
-      p.score = 0;
-    });
-
-    io.to(roomCode).emit("quiz_started", {
-      totalQuestions: room.questions.length,
-    });
-
+    Object.values(room.players).forEach(p => { p.score = 0; });
+    io.to(roomCode).emit("quiz_started", { totalQuestions: room.questions.length });
     setTimeout(() => startQuestion(roomCode), 1500);
   });
 
-  // PLAYER: Submit answer (CRITICAL - enforce one-answer rule on server)
+  // PLAYER: submit answer
   socket.on("submit_answer", ({ roomCode, answer }) => {
     const room = rooms[roomCode];
     if (!room) return;
-
     const player = room.players[socket.id];
-    if (!player) return; // not a player
+    if (!player || player.hasAnswered || room.state !== "question") return;
 
-    // ENFORCE: one answer per question
-    if (player.hasAnswered) {
-      socket.emit("error", { message: "You already answered this question" });
-      return;
-    }
-
-    if (room.state !== "question") {
-      socket.emit("error", { message: "Question is not active" });
-      return;
-    }
-
-    // Lock the answer
     player.hasAnswered = true;
-    player.answer = answer;
-    player.timeLeft = room.timeRemaining;
+    player.answer      = answer;
+    player.timeLeft    = room.timeRemaining;
 
-    socket.emit("answer_locked", {
-      answer,
-      timeLeft: room.timeRemaining,
-    });
+    socket.emit("answer_locked", { answer, timeLeft: room.timeRemaining });
 
-    // Check if all players answered
-    const allAnswered = Object.values(room.players).every((p) => p.hasAnswered);
-    if (allAnswered && Object.keys(room.players).length > 0) {
-      endQuestion(roomCode);
-    }
+    const allAnswered = Object.values(room.players).length > 0 &&
+                        Object.values(room.players).every(p => p.hasAnswered);
+    if (allAnswered) endQuestion(roomCode);
   });
 
-  // HOST: Next question
-  socket.on("next_question", ({ roomCode }) => {
-    const room = rooms[roomCode];
-    if (!room) return;
-    if (room.hostId !== socket.id) return;
-
-    room.currentQuestionIndex += 1;
-
-    if (room.currentQuestionIndex >= room.questions.length) {
-      room.state = "finished";
-      const lb = getLeaderboard(room);
-      io.to(roomCode).emit("quiz_finished", { leaderboard: lb });
-    } else {
-      startQuestion(roomCode);
-    }
-  });
-
-  // Disconnect handler
+  // Disconnect
   socket.on("disconnect", () => {
     const roomCode = socket.roomCode;
     if (!roomCode || !rooms[roomCode]) return;
-
     const room = rooms[roomCode];
-
     if (socket.isHost) {
-      // Host left — end the game
-      clearRoomTimer(room);
+      clearTimers(room);
       io.to(roomCode).emit("error", { message: "Host disconnected. Game ended." });
+      // Clean up images
+      Object.keys(imageStore).forEach(k => { if (k.startsWith(roomCode + "_")) delete imageStore[k]; });
       delete rooms[roomCode];
     } else {
       delete room.players[socket.id];
-      io.to(roomCode).emit("player_joined", {
-        players: Object.entries(room.players).map(([id, p]) => ({
-          id,
-          name: p.name,
-          score: p.score,
-        })),
-      });
+      const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score }));
+      io.to(roomCode).emit("player_joined", { players: playerList });
     }
-
-    console.log(`Socket ${socket.id} disconnected from room ${roomCode}`);
+    console.log(`- disconnected: ${socket.id} from ${roomCode}`);
   });
 });
 
-// Health check
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.get("/health", (req, res) => res.json({ status: "ok", rooms: Object.keys(rooms).length }));
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`EndPlays server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`EndPlays server on :${PORT}`));
