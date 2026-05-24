@@ -257,7 +257,14 @@ io.on("connection", socket => {
 
     const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score, avatarIndex: p.avatarIndex }));
     io.to(roomCode).emit("player_joined", { players: playerList, newPlayerName: playerName });
-    socket.emit("join_success", { roomCode, playerName, category: room.category, customCategory: room.customCategory, avatarIndex });
+    socket.emit("join_success", {
+      roomCode,
+      playerName,
+      category: room.category,
+      customCategory: room.customCategory,
+      avatarIndex,
+      themeImageUrl: imageStore[`${roomCode}_theme`] ? `/img/${roomCode}/theme` : null
+    });
     console.log(`${playerName} joined ${roomCode} with avatar ${avatarIndex}`);
   });
 

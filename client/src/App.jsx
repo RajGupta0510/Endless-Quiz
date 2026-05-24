@@ -1601,6 +1601,18 @@ export default function App() {
       setRoomCustomCategory(customCategory);
       setScreen("lobby-host");
 
+      // Upload theme image first if it exists
+      if (themeImage) {
+        try {
+          const compressed = await compressImage(themeImage);
+          const [header, data] = compressed.split(",");
+          const mimeType = header.match(/:(.*?);/)[1];
+          s.emit("upload_image", { roomCode, questionIndex: "theme", mimeType, data });
+        } catch (e) {
+          console.warn("Failed to upload theme image", e);
+        }
+      }
+
       // Upload each image to the server now that we have the roomCode.
       // Server stores them and serves them via HTTP to ALL players.
       const imgs = s._pendingImages || [];
@@ -1619,10 +1631,13 @@ export default function App() {
       }
       delete s._pendingImages;
     });
-    s.on("join_success", ({ roomCode, playerName, category: joinedCat, customCategory: joinedCust, avatarIndex }) => {
+    s.on("join_success", ({ roomCode, playerName, category: joinedCat, customCategory: joinedCust, avatarIndex, themeImageUrl }) => {
       setRoomCode(roomCode); setMyName(playerName); myNameRef.current = playerName;
       setRoomCategory(joinedCat || "Endless");
       setRoomCustomCategory(joinedCust || "");
+      if (themeImageUrl) {
+        setThemeImage(`${SERVER_URL}${themeImageUrl}`);
+      }
       if (typeof avatarIndex === 'number') {
         setMyAvatarIdx(avatarIndex);
       }
@@ -1725,7 +1740,7 @@ export default function App() {
     s.on("error", ({ message }) => showErr(message));
     s.on("connect_error", () => showErr("Cannot connect to server. Is it running on port 3001?"));
     return s;
-  }, [category, customCategory]);
+  }, [category, customCategory, themeImage]);
 
   function validateQs() {
     for (let i = 0; i < questions.length; i++) {
