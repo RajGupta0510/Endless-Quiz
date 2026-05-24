@@ -1644,6 +1644,23 @@ export default function App() {
   const showErr = m => { setErrMsg(m); setTimeout(() => setErrMsg(""), 3500); };
   useEffect(() => { myNameRef.current = myName; }, [myName]);
 
+  // Auto-detect join code from path (/join/ABCDEF) or search query parameters (?room=ABCDEF or ?join=ABCDEF)
+  useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/\/join\/([A-Za-z0-9]{4,6})/i);
+    let code = match ? match[1] : "";
+
+    if (!code) {
+      const params = new URLSearchParams(window.location.search);
+      code = params.get("room") || params.get("join") || "";
+    }
+
+    if (code) {
+      setJoinCode(code.toUpperCase().trim());
+      setScreen("join");
+    }
+  }, []);
+
   const setupSocket = useCallback(() => {
     if (socketRef.current) socketRef.current.disconnect();
     const s = createSocket();
@@ -1856,7 +1873,8 @@ export default function App() {
     setJoinCode("");
   }
 
-  const shareLink = `endplays.xyz/join/${roomCode}`;
+  const clientOrigin = process.env.REACT_APP_CLIENT_URL || window.location.origin;
+  const shareLink = `${clientOrigin}/join/${roomCode}`;
 
   function handleLogoClick() {
     const activeSession = ["lobby-host", "lobby-player", "game"].includes(screen);
@@ -2257,7 +2275,7 @@ export default function App() {
             </button>
           </div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,.45)", marginTop: 10 }}>
-            {shareLink}
+            {shareLink.replace(/^https?:\/\//, "")}
           </div>
         </GCard>
 
