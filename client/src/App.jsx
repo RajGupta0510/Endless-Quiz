@@ -699,17 +699,17 @@ function BgShapes() {
 }
 
 function ThemeBg({ category }) {
-  let emojis = ["⭐", "✨", "🌀", "🔮", "🪄", "💫"];
-  if (category === "Sports") emojis = ["⚽", "🏀", "🏈", "⚾", "🎾", "🏆", "🥇"];
-  else if (category === "Music") emojis = ["🎵", "🎶", "🎸", "🎹", "🎧", "🎤", "🎼"];
-  else if (category === "Movies") emojis = ["🎬", "🍿", "🎥", "⭐", "🎟️", "📽️", "🍿"];
-  else if (category === "Tech") emojis = ["💻", "⚙️", "🔌", "📡", "🔋", "⌨️", "🚀", "🖥️"];
-  else if (category === "Geography") emojis = ["🌍", "🗺️", "🧭", "🏔️", "🌋", "🏝️", "⛵"];
-  else if (category === "Art") emojis = ["🎨", "🖌️", "🖼️", "✏️", "🎭", "✒️", "🌈"];
-  else if (category === "Food") emojis = ["🍕", "🍔", "🍟", "🍩", "🍪", "🍓", "🍉", "🍰"];
-  else if (category === "Nature") emojis = ["🍃", "🍁", "🌸", "🦋", "🍄", "🍀", "🌻", "🌿"];
-
   const particles = useMemo(() => {
+    let emojis = ["⭐", "✨", "🌀", "🔮", "🪄", "💫"];
+    if (category === "Sports") emojis = ["⚽", "🏀", "🏈", "⚾", "🎾", "🏆", "🥇"];
+    else if (category === "Music") emojis = ["🎵", "🎶", "🎸", "🎹", "🎧", "🎤", "🎼"];
+    else if (category === "Movies") emojis = ["🎬", "🍿", "🎥", "⭐", "🎟️", "📽️", "🍿"];
+    else if (category === "Tech") emojis = ["💻", "⚙️", "🔌", "📡", "🔋", "⌨️", "🚀", "🖥️"];
+    else if (category === "Geography") emojis = ["🌍", "🗺️", "🧭", "🏔️", "🌋", "🏝️", "⛵"];
+    else if (category === "Art") emojis = ["🎨", "🖌️", "🖼️", "✏️", "🎭", "✒️", "🌈"];
+    else if (category === "Food") emojis = ["🍕", "🍔", "🍟", "🍩", "🍪", "🍓", "🍉", "🍰"];
+    else if (category === "Nature") emojis = ["🍃", "🍁", "🌸", "🦋", "🍄", "🍀", "🌻", "🌿"];
+
     return Array.from({ length: 12 }).map((_, i) => ({
       emoji: emojis[i % emojis.length],
       left: `${(i * 8) + Math.random() * 4}%`,
@@ -1623,7 +1623,6 @@ export default function App() {
   const [nextCdSecs, setNextCdSecs] = useState(null);  // countdown 5→1 on leaderboard
   const [errMsg, setErrMsg] = useState("");
   const [typedInput, setTypedInput] = useState("");    // player's typed answer for typed/fillinblank
-  const [playerOrder, setPlayerOrder] = useState([]);    // player's drag order for reorder questions
   const [isTyping, setIsTyping] = useState(true);
   const [showDoublePointsAnim, setShowDoublePointsAnim] = useState(false);
   const [myAvatarIdx, setMyAvatarIdx] = useState(0);
@@ -1728,8 +1727,6 @@ export default function App() {
       setFbOk(null);
       setPtsEarned(0);
       setTypedInput("");
-      // For reorder questions: playerOrder starts as the server-shuffled options
-      setPlayerOrder(q.options || []);
       setNextCdSecs(null);
 
       // Typewriter and Double Points overlay triggers
@@ -1798,7 +1795,7 @@ export default function App() {
     s.on("error", ({ message }) => showErr(message));
     s.on("connect_error", () => showErr("Cannot connect to server. Is it running on port 3001?"));
     return s;
-  }, []);
+  }, [category, customCategory]);
 
   function validateQs() {
     for (let i = 0; i < questions.length; i++) {
@@ -1992,18 +1989,18 @@ export default function App() {
         {/* Floating backdrop particles from ThemeBg will drift over the entire page */}
         <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
           <div className="hero-flank-container fu">
-            {/* <div className="hero-decor">
+            <div className="hero-decor">
               <Crown3D />
-            </div> */}
+            </div>
             <div className="hero-h" style={{
               fontWeight: 700, fontSize: 54, color: "#fff",
               lineHeight: 1.08, letterSpacing: ".01em"
             }}>
               Play fun quizzes<br />with friends
             </div>
-            {/* <div className="hero-decor">
+            <div className="hero-decor">
               <Trophy3D />
-            </div> */}
+            </div>
           </div>
           <div className="fu" style={{
             fontSize: 17, color: "rgba(255,255,255,.86)", fontWeight: 400,
@@ -2318,9 +2315,14 @@ export default function App() {
         </Card>
 
         <Card>
-          <GT size={20} style={{ display: "block", marginBottom: 14 }}>
-            {quizTitle || "Your Quiz"} — {questions.length} Questions
-          </GT>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+            <GT size={20}>
+              {quizTitle || "Your Quiz"} — {questions.length} Questions
+            </GT>
+            <Pill color={C.purple}>
+              {roomCategory === "Custom" ? roomCustomCategory || "Custom" : roomCategory}
+            </Pill>
+          </div>
           {questions.map((q, i) => (
             <div key={i} style={{
               display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
@@ -2403,8 +2405,13 @@ export default function App() {
         </GCard>
 
         <Card>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <GT size={20}>Players ({players.length})</GT>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <GT size={20}>Players ({players.length})</GT>
+              <Pill color={C.purple}>
+                {roomCategory === "Custom" ? roomCustomCategory || "Custom" : roomCategory}
+              </Pill>
+            </div>
             <Pill color="#22c55e">Online</Pill>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
