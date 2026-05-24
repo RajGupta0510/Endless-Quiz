@@ -221,77 +221,7 @@ const AVATARS = [
   ),
 ];
 
-const Crown3D = () => (
-  <svg width="68" height="68" viewBox="0 0 100 100" style={{
-    filter: "drop-shadow(0 8px 16px rgba(251,191,36,0.35))",
-    animation: "bounce 2.6s ease-in-out infinite alternate"
-  }}>
-    <defs>
-      <linearGradient id="crownGold" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FFF3B0" />
-        <stop offset="30%" stopColor="#FBBF24" />
-        <stop offset="70%" stopColor="#D97706" />
-        <stop offset="100%" stopColor="#78350F" />
-      </linearGradient>
-      <linearGradient id="gemRed" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FF8080" />
-        <stop offset="100%" stopColor="#B91C1C" />
-      </linearGradient>
-      <linearGradient id="gemBlue" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#93C5FD" />
-        <stop offset="100%" stopColor="#1D4ED8" />
-      </linearGradient>
-    </defs>
-    <circle cx="20" cy="35" r="4" fill="url(#gemBlue)" />
-    <circle cx="80" cy="35" r="4" fill="url(#gemBlue)" />
-    <path d="M15 75 L18 35 L38 52 L50 25 L62 52 L82 35 L85 75 Z" fill="url(#crownGold)" stroke="#92400E" strokeWidth="1.5" strokeLinejoin="round" />
-    <path d="M15 75 C15 70, 85 70, 85 75 C85 80, 15 80, 15 75 Z" fill="#92400E" opacity="0.15" />
-    <rect x="15" y="70" width="70" height="8" rx="4" fill="url(#crownGold)" stroke="#78350F" strokeWidth="1.2" />
-    <circle cx="30" cy="74" r="3.5" fill="url(#gemRed)" />
-    <circle cx="50" cy="74" r="3.5" fill="url(#gemBlue)" />
-    <circle cx="70" cy="74" r="3.5" fill="url(#gemRed)" />
-    <circle cx="18" cy="32" r="5" fill="url(#gemRed)" stroke="#78350F" strokeWidth="1" />
-    <circle cx="50" cy="21" r="6" fill="url(#gemBlue)" stroke="#1E3A8A" strokeWidth="1.2" />
-    <circle cx="82" cy="32" r="5" fill="url(#gemRed)" stroke="#78350F" strokeWidth="1" />
-    <path d="M19 36 L36 51" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-    <path d="M48 26 L42 42" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-    <path d="M51 26 L57 42" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-    <path d="M81 36 L64 51" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-    <path d="M25 20 L27 25 L32 27 L27 29 L25 34 L23 29 L18 27 L23 25 Z" fill="#FFF" opacity="0.8" />
-    <path d="M72 15 L73.5 19 L77.5 20.5 L73.5 22 L72 26 L70.5 22 L66.5 20.5 L70.5 19 Z" fill="#FFF" opacity="0.8" />
-  </svg>
-);
 
-const Trophy3D = () => (
-  <svg width="68" height="68" viewBox="0 0 100 100" style={{
-    filter: "drop-shadow(0 8px 16px rgba(251,191,36,0.35))",
-    animation: "bounce 2.6s ease-in-out infinite alternate",
-    animationDelay: "0.3s"
-  }}>
-    <defs>
-      <linearGradient id="trophyGold" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FFF3B0" />
-        <stop offset="40%" stopColor="#FBBF24" />
-        <stop offset="80%" stopColor="#D97706" />
-        <stop offset="100%" stopColor="#78350F" />
-      </linearGradient>
-      <linearGradient id="baseDark" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#374151" />
-        <stop offset="100%" stopColor="#111827" />
-      </linearGradient>
-    </defs>
-    <path d="M25 32 C12 32, 12 52, 28 52" stroke="url(#trophyGold)" strokeWidth="7" fill="none" strokeLinecap="round" />
-    <path d="M75 32 C88 32, 88 52, 72 52" stroke="url(#trophyGold)" strokeWidth="7" fill="none" strokeLinecap="round" />
-    <path d="M28 22 L72 22 C72 48, 62 60, 50 60 C38 60, 28 48, 28 22 Z" fill="url(#trophyGold)" stroke="#92400E" strokeWidth="1.5" />
-    <path d="M43 60 L57 60 L54 75 L46 75 Z" fill="url(#trophyGold)" stroke="#92400E" strokeWidth="1.2" />
-    <rect x="35" y="75" width="30" height="12" rx="3" fill="url(#baseDark)" stroke="#111827" strokeWidth="1.5" />
-    <rect x="32" y="85" width="36" height="5" rx="1.5" fill="url(#baseDark)" />
-    <path d="M33 26 C33 42, 40 52, 50 52" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.6" />
-    <path d="M67 26 C67 42, 60 52, 50 52" stroke="#FFF" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.3" />
-    <path d="M42 35 L44 39 L48 40.5 L44 42 L42 46 L40 42 L36 40.5 L40 39 Z" fill="#FFF" opacity="0.85" />
-    <path d="M62 48 L63.5 51 L66.5 52 L63.5 53 L62 56 L60.5 53 L57.5 52 L60.5 51 Z" fill="#FFF" opacity="0.7" />
-  </svg>
-);
 
 // Category SVG icons — clean minimal SVGs, no emojis
 const CAT_ICONS = {
@@ -1989,17 +1919,11 @@ export default function App() {
         {/* Floating backdrop particles from ThemeBg will drift over the entire page */}
         <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
           <div className="hero-flank-container fu">
-            <div className="hero-decor">
-              <Crown3D />
-            </div>
             <div className="hero-h" style={{
               fontWeight: 700, fontSize: 54, color: "#fff",
               lineHeight: 1.08, letterSpacing: ".01em"
             }}>
               Play fun quizzes<br />with friends
-            </div>
-            <div className="hero-decor">
-              <Trophy3D />
             </div>
           </div>
           <div className="fu" style={{
