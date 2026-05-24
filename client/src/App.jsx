@@ -1,9 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { io } from "socket.io-client";
 
-// Auto-detect server URL — works on localhost AND when friends connect via 192.168.x.x
-// The server always lives on the same host as the page, just port 3001.
-const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
+// Auto-detect server URL — supports custom production URL via environment variables
+const SERVER_URL = process.env.REACT_APP_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
 (() => {
   const l = document.createElement("link");
@@ -82,20 +81,250 @@ const OPTS = [
   { color: C.green, bg: "#f0fff8", border: "#A0EFD0", shape: "■", label: "D" },
 ];
 
-const AVATARS = ["🐱", "🐶", "🦊", "🐸", "🐼", "🦄", "🐯", "🦁", "🐨", "🦋", "🦀", "🐙", "🦉", "🐧", "🦩", "🐬"];
+const AVATARS = [
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#7C5CFA"/><stop offset="100%" stopColor="#A78BFA"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG1)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#1E293B"/>
+      <circle cx="50" cy="44" r="18" fill="#FDBA74"/>
+      <path d="M32 38 C30 18, 52 8, 58 20 C64 10, 72 22, 68 38 C60 36, 50 33, 50 38 Z" fill="#EA580C"/>
+      <rect x="36" y="40" width="28" height="6" rx="3" fill="#0F172A"/>
+      <circle cx="41" cy="43" r="5.5" fill="#0F172A"/><circle cx="59" cy="43" r="5.5" fill="#0F172A"/>
+      <line x1="41" y1="43" x2="44" y2="43" stroke="#fff" strokeWidth="1" strokeLinecap="round"/>
+      <line x1="59" y1="43" x2="62" y2="43" stroke="#fff" strokeWidth="1" strokeLinecap="round"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#EC4899"/><stop offset="100%" stopColor="#F472B6"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG2)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#312E81"/>
+      <circle cx="50" cy="44" r="18" fill="#FED7AA"/>
+      <path d="M30 35 C28 20, 72 20, 70 35 C70 48, 62 46, 50 44 Z" fill="#8B5CF6"/>
+      <path d="M28 42 C28 35, 72 35, 72 42" fill="none" stroke="#DB2777" strokeWidth="4.5" strokeLinecap="round"/>
+      <rect x="25" y="39" width="7" height="12" rx="3.5" fill="#DB2777"/>
+      <rect x="68" y="39" width="7" height="12" rx="3.5" fill="#DB2777"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3B82F6"/><stop offset="100%" stopColor="#60A5FA"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG3)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#065F46"/>
+      <circle cx="50" cy="45" r="18" fill="#FDBA74"/>
+      <path d="M47 56 C44 56, 42 54, 42 52 C42 50, 48 48, 50 48 C52 48, 58 50, 58 52 C58 54, 56 56, 53 56 Z" fill="#9A3412" opacity="0.3"/>
+      <path d="M30 36 C32 18, 68 18, 70 36 Z" fill="#475569"/>
+      <rect x="28" y="33" width="44" height="6" rx="3" fill="#334155"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#FBBF24"/><stop offset="100%" stopColor="#F59E0B"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG4)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#020617"/>
+      <circle cx="50" cy="44" r="18" fill="#7C2D12"/>
+      <circle cx="50" cy="38" r="23" fill="#1C1917"/>
+      <circle cx="50" cy="44" r="18" fill="#7C2D12"/>
+      <rect x="34" y="40" width="32" height="7" rx="3.5" fill="#10B981" opacity="0.8"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#10B981"/><stop offset="100%" stopColor="#34D399"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG5)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#991B1B"/>
+      <circle cx="50" cy="44" r="18" fill="#F59E0B"/>
+      <circle cx="31" cy="45" r="5.5" stroke="#FBBF24" strokeWidth="2.5" fill="none"/>
+      <circle cx="69" cy="45" r="5.5" stroke="#FBBF24" strokeWidth="2.5" fill="none"/>
+      <path d="M30 38 C32 20, 68 20, 70 38 Z" fill="#0F172A"/>
+      <circle cx="50" cy="22" r="9" fill="#0F172A"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG6" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#06B6D4"/><stop offset="100%" stopColor="#22D3EE"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG6)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#3730A3"/>
+      <circle cx="50" cy="45" r="18" fill="#FFD2A1"/>
+      <path d="M30 38 C32 18, 58 10, 68 24 C72 32, 68 40, 66 42 C56 36, 44 38, 30 38 Z" fill="#FCD34D"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG7" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#F97316"/><stop offset="100%" stopColor="#FB923C"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG7)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#1E3A8A"/>
+      <circle cx="50" cy="44" r="18" fill="#D97706"/>
+      <path d="M32 36 C34 32, 66 32, 68 36 L68 40 L32 40 Z" fill="#EF4444"/>
+      <circle cx="34" cy="38" r="2.5" fill="#EF4444"/><circle cx="66" cy="38" r="2.5" fill="#EF4444"/>
+      <path d="M32 32 C32 20, 68 20, 68 32 Z" fill="#3F2B18"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG8" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#6366F1"/><stop offset="100%" stopColor="#818CF8"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG8)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#475569"/>
+      <circle cx="50" cy="44" r="18" fill="#FED7AA"/>
+      <path d="M30 38 C32 18, 68 18, 70 38 Z" fill="#E2E8F0"/>
+      <path d="M32 30 C34 30, 36 34, 36 38" stroke="#E2E8F0" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d="M68 30 C66 30, 64 34, 64 38" stroke="#E2E8F0" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <rect x="34" y="41" width="32" height="5" rx="2.5" fill="#06B6D4" opacity="0.9"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG9" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#14B8A6"/><stop offset="100%" stopColor="#5EEAD4"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG9)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#3F3F46"/>
+      <circle cx="50" cy="45" r="18" fill="#FDBA74"/>
+      <path d="M32 36 C34 22, 66 22, 68 36 Z" fill="#DC2626"/>
+      <path d="M45 22 L24 28" stroke="#DC2626" strokeWidth="4.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG10" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#A855F7"/><stop offset="100%" stopColor="#C084FC"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG10)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#D97706"/>
+      <circle cx="50" cy="44" r="18" fill="#FFD2A1"/>
+      <path d="M28 36 C28 20, 72 20, 72 36 Z" fill="#78350F"/>
+      <circle cx="40" cy="43" r="5.5" stroke="#1E293B" strokeWidth="2" fill="none"/>
+      <circle cx="60" cy="43" r="5.5" stroke="#1E293B" strokeWidth="2" fill="none"/>
+      <line x1="45.5" y1="43" x2="54.5" y2="43" stroke="#1E293B" strokeWidth="2"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG11" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#F43F5E"/><stop offset="100%" stopColor="#FDA4AF"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG11)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#0F766E"/>
+      <circle cx="50" cy="44" r="18" fill="#9A3412"/>
+      <rect x="25" y="26" width="8" height="36" rx="4" fill="#451A03"/>
+      <rect x="67" y="26" width="8" height="36" rx="4" fill="#451A03"/>
+      <circle cx="34" cy="24" r="6" fill="#451A03"/>
+      <circle cx="66" cy="24" r="6" fill="#451A03"/>
+      <path d="M30 36 C32 20, 68 20, 70 36 Z" fill="#451A03"/>
+    </svg>
+  ),
+  (
+    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+      <defs><linearGradient id="avG12" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#0F172A"/><stop offset="100%" stopColor="#334155"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="50" fill="url(#avG12)"/>
+      <path d="M20 92 C20 74, 35 68, 50 68 C65 68, 80 74, 80 92 Z" fill="#111827"/>
+      <circle cx="50" cy="44" r="18" fill="#FEE2E2"/>
+      <path d="M30 34 C30 20, 70 20, 70 34 Z" fill="#1E293B"/>
+      <rect x="30" y="38" width="40" height="9" rx="4.5" fill="#3B82F6" stroke="#60A5FA" strokeWidth="1"/>
+      <line x1="30" y1="42.5" x2="70" y2="42.5" stroke="#00D2FF" strokeWidth="1.5" strokeDasharray="3 2"/>
+    </svg>
+  ),
+];
+
+const Crown3D = () => (
+  <svg width="68" height="68" viewBox="0 0 100 100" style={{
+    filter: "drop-shadow(0 8px 16px rgba(251,191,36,0.35))",
+    animation: "bounce 2.6s ease-in-out infinite alternate"
+  }}>
+    <defs>
+      <linearGradient id="crownGold" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FFF3B0" />
+        <stop offset="30%" stopColor="#FBBF24" />
+        <stop offset="70%" stopColor="#D97706" />
+        <stop offset="100%" stopColor="#78350F" />
+      </linearGradient>
+      <linearGradient id="gemRed" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FF8080" />
+        <stop offset="100%" stopColor="#B91C1C" />
+      </linearGradient>
+      <linearGradient id="gemBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#93C5FD" />
+        <stop offset="100%" stopColor="#1D4ED8" />
+      </linearGradient>
+    </defs>
+    <circle cx="20" cy="35" r="4" fill="url(#gemBlue)" />
+    <circle cx="80" cy="35" r="4" fill="url(#gemBlue)" />
+    <path d="M15 75 L18 35 L38 52 L50 25 L62 52 L82 35 L85 75 Z" fill="url(#crownGold)" stroke="#92400E" strokeWidth="1.5" strokeLinejoin="round" />
+    <path d="M15 75 C15 70, 85 70, 85 75 C85 80, 15 80, 15 75 Z" fill="#92400E" opacity="0.15" />
+    <rect x="15" y="70" width="70" height="8" rx="4" fill="url(#crownGold)" stroke="#78350F" strokeWidth="1.2" />
+    <circle cx="30" cy="74" r="3.5" fill="url(#gemRed)" />
+    <circle cx="50" cy="74" r="3.5" fill="url(#gemBlue)" />
+    <circle cx="70" cy="74" r="3.5" fill="url(#gemRed)" />
+    <circle cx="18" cy="32" r="5" fill="url(#gemRed)" stroke="#78350F" strokeWidth="1" />
+    <circle cx="50" cy="21" r="6" fill="url(#gemBlue)" stroke="#1E3A8A" strokeWidth="1.2" />
+    <circle cx="82" cy="32" r="5" fill="url(#gemRed)" stroke="#78350F" strokeWidth="1" />
+    <path d="M19 36 L36 51" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
+    <path d="M48 26 L42 42" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
+    <path d="M51 26 L57 42" stroke="#FFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+    <path d="M81 36 L64 51" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
+    <path d="M25 20 L27 25 L32 27 L27 29 L25 34 L23 29 L18 27 L23 25 Z" fill="#FFF" opacity="0.8" />
+    <path d="M72 15 L73.5 19 L77.5 20.5 L73.5 22 L72 26 L70.5 22 L66.5 20.5 L70.5 19 Z" fill="#FFF" opacity="0.8" />
+  </svg>
+);
+
+const Trophy3D = () => (
+  <svg width="68" height="68" viewBox="0 0 100 100" style={{
+    filter: "drop-shadow(0 8px 16px rgba(251,191,36,0.35))",
+    animation: "bounce 2.6s ease-in-out infinite alternate",
+    animationDelay: "0.3s"
+  }}>
+    <defs>
+      <linearGradient id="trophyGold" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FFF3B0" />
+        <stop offset="40%" stopColor="#FBBF24" />
+        <stop offset="80%" stopColor="#D97706" />
+        <stop offset="100%" stopColor="#78350F" />
+      </linearGradient>
+      <linearGradient id="baseDark" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#374151" />
+        <stop offset="100%" stopColor="#111827" />
+      </linearGradient>
+    </defs>
+    <path d="M25 32 C12 32, 12 52, 28 52" stroke="url(#trophyGold)" strokeWidth="7" fill="none" strokeLinecap="round" />
+    <path d="M75 32 C88 32, 88 52, 72 52" stroke="url(#trophyGold)" strokeWidth="7" fill="none" strokeLinecap="round" />
+    <path d="M28 22 L72 22 C72 48, 62 60, 50 60 C38 60, 28 48, 28 22 Z" fill="url(#trophyGold)" stroke="#92400E" strokeWidth="1.5" />
+    <path d="M43 60 L57 60 L54 75 L46 75 Z" fill="url(#trophyGold)" stroke="#92400E" strokeWidth="1.2" />
+    <rect x="35" y="75" width="30" height="12" rx="3" fill="url(#baseDark)" stroke="#111827" strokeWidth="1.5" />
+    <rect x="32" y="85" width="36" height="5" rx="1.5" fill="url(#baseDark)" />
+    <path d="M33 26 C33 42, 40 52, 50 52" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.6" />
+    <path d="M67 26 C67 42, 60 52, 50 52" stroke="#FFF" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.3" />
+    <path d="M42 35 L44 39 L48 40.5 L44 42 L42 46 L40 42 L36 40.5 L40 39 Z" fill="#FFF" opacity="0.85" />
+    <path d="M62 48 L63.5 51 L66.5 52 L63.5 53 L62 56 L60.5 53 L57.5 52 L60.5 51 Z" fill="#FFF" opacity="0.7" />
+  </svg>
+);
 
 // Category SVG icons — clean minimal SVGs, no emojis
 const CAT_ICONS = {
   Endless: (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <path d="M9 2C5.13 2 2 5.13 2 9s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7zm0 2a5 5 0 1 1 0 10A5 5 0 0 1 9 4z" fill="#7C5CFA" />
-      <path d="M6 9c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3-3-1.34-3-3z" fill="#FF4EC3" />
+    <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
+      <rect width="100" height="100" rx="24" fill="#0b090f" />
+      <path d="M16 38 c0 -4 3 -7 7 -7 h3 C31 31 35 28 37 25 C40 20 45 15 52 15 h18 c6 0 10 3 10 8 s-4 8 -10 8 H48 c-4 0 -7 3 -7 7 v1 c0 4 -3 7 -7 7 H23 c-4 0 -7 -3 -7 -7 z" fill="#ffffff" />
+      <rect x="44" y="44" width="40" height="14" rx="7" fill="#ffffff" />
+      <path d="M16 62 c0 4 3 7 7 7 h3 C31 69 35 72 37 75 C40 80 45 85 52 85 h18 c6 0 10 -3 10 -8 s-4 -8 -10 -8 H48 c-4 0 -7 -3 -7 -7 v-1 c0 -4 -3 -7 -7 -7 H23 c-4 0 -7 3 -7 7 z" fill="#ffffff" />
     </svg>
   ),
   Luffa: (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <rect x="2" y="7" width="14" height="4" rx="2" fill="#7C5CFA" />
-      <rect x="7" y="2" width="4" height="14" rx="2" fill="#FF4EC3" opacity="0.7" />
+    <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="luffaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00d2ff" />
+          <stop offset="50%" stopColor="#7C5CFA" />
+          <stop offset="100%" stopColor="#FF4EC3" />
+        </linearGradient>
+      </defs>
+      <rect width="100" height="100" rx="24" fill="url(#luffaGrad)" />
+      <polygon points="50,15 32,32 68,32" fill="#ffffff" opacity="0.45" />
+      <polygon points="32,32 15,48 32,58" fill="#ffffff" opacity="0.6" />
+      <polygon points="68,32 85,48 68,58" fill="#ffffff" opacity="0.6" />
+      <polygon points="32,32 68,32 50,55" fill="#ffffff" opacity="0.8" />
+      <polygon points="15,48 15,68 32,58" fill="#ffffff" opacity="0.5" />
+      <polygon points="85,48 85,68 68,58" fill="#ffffff" opacity="0.5" />
+      <polygon points="32,58 50,55 68,58" fill="#ffffff" opacity="0.95" />
+      <polygon points="32,58 68,58 50,82" fill="#ffffff" opacity="0.8" />
+      <polygon points="15,68 50,82 32,58" fill="#ffffff" opacity="0.7" />
+      <polygon points="85,68 50,82 68,58" fill="#ffffff" opacity="0.7" />
+      <polygon points="15,68 50,82 50,92" fill="#ffffff" opacity="0.3" />
+      <polygon points="85,68 50,82 50,92" fill="#ffffff" opacity="0.3" />
     </svg>
   ),
   General: (
@@ -279,6 +508,8 @@ const gcss = `
   @keyframes glow   {0%,100%{box-shadow:0 0 12px #7C5CFA44}50%{box-shadow:0 0 28px #7C5CFA88}}
   @keyframes scoreUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   @keyframes revealOpt{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+  @keyframes floatUp {0%{transform:translateY(0) rotate(0deg);opacity:0}10%{opacity:0.12}90%{opacity:0.12}100%{transform:translateY(-110vh) rotate(360deg);opacity:0}}
+  @keyframes pulseGlow{0%,100%{transform:scale(1);opacity:0.25}50%{transform:scale(1.08);opacity:0.55}}
   @keyframes lockPulse{0%,100%{box-shadow:0 4px 16px rgba(124,92,250,.2);transform:scale(1)}50%{box-shadow:0 4px 22px rgba(124,92,250,.45);transform:scale(1.025)}}
   @keyframes cdRing{0%,100%{transform:scale(1);box-shadow:0 4px 14px rgba(124,92,250,.4)}50%{transform:scale(1.12);box-shadow:0 4px 22px rgba(124,92,250,.65)}}
   .fu {animation:fadeUp .42s cubic-bezier(.22,1,.36,1) both}
@@ -291,6 +522,33 @@ const gcss = `
   .opt-b:active{transform:scale(.97)}
   ::-webkit-scrollbar{width:5px}
   ::-webkit-scrollbar-thumb{background:${C.purpleD}44;border-radius:4px}
+  
+  .navbar {
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(12px);
+    border-bottom: 1.5px solid ${C.border}55;
+    padding: 0 28px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    box-shadow: 0 2px 16px rgba(124,92,250,.07);
+    transition: all 0.22s ease;
+  }
+  .nav-btn-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .btn-text-short {
+    display: none;
+  }
+  .btn-text-long {
+    display: inline;
+  }
   
   .pin-card {
     background: rgba(255,255,255,.18);
@@ -361,6 +619,56 @@ const gcss = `
       width: 100% !important;
       padding: 14px 28px !important;
     }
+    .navbar {
+      padding: 0 14px !important;
+      height: 58px !important;
+    }
+    .navbar .logo-text {
+      font-size: 24px !important;
+    }
+    .nav-btn-container {
+      gap: 6px !important;
+    }
+    .navbar button {
+      padding: 8px 12px !important;
+      font-size: 13px !important;
+      border-radius: 10px !important;
+    }
+    .btn-text-long {
+      display: none !important;
+    }
+    .btn-text-short {
+      display: inline !important;
+    }
+  }
+
+  .hero-flank-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .hero-decor {
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+  }
+  @media (max-width: 768px) {
+    .hero-decor {
+      display: none !important;
+    }
+    .hero-flank-container {
+      gap: 0;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .footer-sig {
+      position: static !important;
+      margin-top: 14px !important;
+      justify-content: center !important;
+    }
   }
 `;
 const GCss = () => <style>{gcss}</style>;
@@ -368,11 +676,11 @@ const GCss = () => <style>{gcss}</style>;
 // ── Floating background shapes ─────────────────────────────────────────────────
 function BgShapes() {
   const shapes = [
-    { w: 220, h: 220, top: -60, left: -70, color: "#7C5CFA0d", delay: 0 },
-    { w: 160, h: 160, top: 60, right: -50, color: "#FF4EC30e", delay: 2.5 },
-    { w: 100, h: 100, top: 220, left: "40%", color: "#FFB8300a", delay: 1.5 },
-    { w: 180, h: 180, bottom: -50, right: 60, color: "#7C5CFA0b", delay: 1 },
-    { w: 70, h: 70, top: 80, left: "65%", color: "#FF4EC30a", delay: 3.5 },
+    { w: 220, h: 220, top: -60, left: -70, color: "rgba(255, 255, 255, 0.08)", delay: 0 },
+    { w: 160, h: 160, top: 60, right: -50, color: "rgba(255, 255, 255, 0.05)", delay: 2.5 },
+    { w: 100, h: 100, top: 220, left: "40%", color: "rgba(255, 255, 255, 0.04)", delay: 1.5 },
+    { w: 180, h: 180, bottom: -50, right: 60, color: "rgba(255, 255, 255, 0.06)", delay: 1 },
+    { w: 70, h: 70, top: 80, left: "65%", color: "rgba(255, 255, 255, 0.05)", delay: 3.5 },
   ];
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
@@ -381,20 +689,113 @@ function BgShapes() {
           position: "absolute", width: s.w, height: s.h, borderRadius: "50%",
           background: s.color, top: s.top, left: s.left, right: s.right, bottom: s.bottom,
           animation: `float ${9 + i * 1.8}s ease-in-out ${s.delay}s infinite`,
-          filter: "blur(2px)",
+          filter: "blur(6px)",
+          border: "1.5px solid rgba(255, 255, 255, 0.09)",
+          boxShadow: "inset 0 0 24px rgba(255, 255, 255, 0.06)"
         }} />
       ))}
     </div>
   );
 }
 
+function ThemeBg({ category }) {
+  let emojis = ["⭐", "✨", "🌀", "🔮", "🪄", "💫"];
+  if (category === "Sports") emojis = ["⚽", "🏀", "🏈", "⚾", "🎾", "🏆", "🥇"];
+  else if (category === "Music") emojis = ["🎵", "🎶", "🎸", "🎹", "🎧", "🎤", "🎼"];
+  else if (category === "Movies") emojis = ["🎬", "🍿", "🎥", "⭐", "🎟️", "📽️", "🍿"];
+  else if (category === "Tech") emojis = ["💻", "⚙️", "🔌", "📡", "🔋", "⌨️", "🚀", "🖥️"];
+  else if (category === "Geography") emojis = ["🌍", "🗺️", "🧭", "🏔️", "🌋", "🏝️", "⛵"];
+  else if (category === "Art") emojis = ["🎨", "🖌️", "🖼️", "✏️", "🎭", "✒️", "🌈"];
+  else if (category === "Food") emojis = ["🍕", "🍔", "🍟", "🍩", "🍪", "🍓", "🍉", "🍰"];
+  else if (category === "Nature") emojis = ["🍃", "🍁", "🌸", "🦋", "🍄", "🍀", "🌻", "🌿"];
+
+  const particles = useMemo(() => {
+    return Array.from({ length: 12 }).map((_, i) => ({
+      emoji: emojis[i % emojis.length],
+      left: `${(i * 8) + Math.random() * 4}%`,
+      delay: Math.random() * 10,
+      duration: 12 + Math.random() * 8,
+      size: 36 + Math.random() * 32,
+    }));
+  }, [category]);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+      {particles.map((p, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          bottom: -50,
+          left: p.left,
+          fontSize: p.size,
+          opacity: 0.12,
+          animation: `floatUp ${p.duration}s linear ${p.delay}s infinite`,
+          filter: "blur(0.5px)",
+        }}>
+          {p.emoji}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Typewriter({ text, speed = 25, onComplete }) {
+  const [displayed, setDisplayed] = useState("");
+  const speakRef = useRef(null);
+  
+  // Use a stable ref for onComplete callback so changing references don't re-trigger typewriter
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    setDisplayed("");
+
+    // 1. Speak the question text using Web Speech API in parallel
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel(); // Cancel any active narration first to prevent overlap
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95; // Slightly slower, premium speed for clearer narration
+        utterance.pitch = 1.0;
+        speakRef.current = utterance;
+        
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("Speech synthesis failed to start:", e);
+      }
+    }
+
+    // 2. Smooth character-by-character time-based typing animation
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayed(text.substring(0, i));
+      if (i >= text.length) {
+        clearInterval(interval);
+        if (onCompleteRef.current) onCompleteRef.current();
+      }
+    }, speed);
+
+    return () => {
+      clearInterval(interval);
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    };
+  }, [text, speed]); // Trigger ONLY when text or speed changes!
+
+  return <span>{displayed}</span>;
+}
+
 // ── Atoms ──────────────────────────────────────────────────────────────────────
-const Logo = ({ size = 28 }) => (
-  <span style={{
+const Logo = ({ size = 28, onClick, style = {} }) => (
+  <span className="logo-text" onClick={onClick} style={{
     fontFamily: "'Fredoka',sans-serif", fontWeight: 700, fontSize: size,
     background: C.grad, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-    letterSpacing: ".02em"
-  }}>EndPlays</span>
+    letterSpacing: ".02em", cursor: onClick ? "pointer" : "default", ...style
+  }}>EndPlays Quiz</span>
 );
 
 function Card({ children, style = {}, cls = "", hover = false }) {
@@ -478,13 +879,14 @@ function ErrBox({ msg }) {
     padding: "12px 16px", fontSize: 15, color: "#dc2626", fontWeight: 600
   }}>Warning: {msg}</div>;
 }
-function Av({ name, size = 40 }) {
-  const idx = name ? (name.charCodeAt(0) + name.length) % AVATARS.length : 0;
+function Av({ name, size = 40, avatarIndex }) {
+  const hashIdx = name ? (name.charCodeAt(0) + name.length) % AVATARS.length : 0;
+  const idx = typeof avatarIndex === 'number' ? avatarIndex : hashIdx;
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%", flexShrink: 0,
       background: C.gradD, display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * .44, boxShadow: "0 2px 8px rgba(124,92,250,.2)"
+      boxShadow: "0 2px 8px rgba(124,92,250,.2)", overflow: "hidden"
     }}>
       {AVATARS[idx]}
     </div>
@@ -590,13 +992,13 @@ function ThemeImgUploader({ value, onChange }) {
         border: `2px dashed ${drag ? C.purple : value ? "#22c55e" : C.border}`,
         borderRadius: 14, overflow: "hidden", cursor: value ? "default" : "pointer",
         background: drag ? "#f0eeff" : value ? "#f0fff8" : "#fafaff",
-        transition: "all .2s", minHeight: 90,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 14
+        transition: "all .2s", height: 180,
+        display: "flex", alignItems: value ? "stretch" : "center", justifyContent: "center", gap: 14
       }}>
       {value
-        ? <div style={{ position: "relative", width: "100%" }}>
+        ? <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
           <img src={value} alt="theme"
-            style={{ width: "100%", maxHeight: 160, objectFit: "cover", display: "block" }} />
+            style={{ width: "100%", height: "100%", minHeight: "100%", display: "block", objectFit: "cover", flex: 1 }} />
           <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
             <button style={{
               padding: "5px 12px", borderRadius: 8, background: "rgba(255,255,255,.9)",
@@ -628,24 +1030,91 @@ function ThemeImgUploader({ value, onChange }) {
 
 // ── Question preview ───────────────────────────────────────────────────────────
 function QPreview({ q }) {
-  const isTyped = q.qType === "typed";
+  const isTextInput = q.qType === "typed" || q.qType === "fillinblank";
+  const isReorder = q.qType === "reorder";
   const opts = [...(q.incorrectAnswers || []), q.correctAnswer || ""].filter(Boolean)
     .sort(() => Math.random() - .5).slice(0, 4);
+
+  const reorderItems = (q.reorderItems || []).filter(Boolean);
+  const hasReorderItems = reorderItems.length > 0;
+  const itemsToRender = hasReorderItems ? reorderItems : ["Item 1", "Item 2", "Item 3", "Item 4"];
+
   return (
     <div style={{ background: "#fafaff", borderRadius: 14, padding: 16, border: `1.5px solid ${C.border}` }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 8 }}>Preview</div>
       {q.image && <img src={q.image} alt="" style={{ width: "100%", maxHeight: 90, objectFit: "contain", borderRadius: 8, marginBottom: 10 }} />}
       <div style={{ fontSize: 14, fontWeight: 600, color: C.navy, marginBottom: 10, minHeight: 18 }}>
-        {q.text || <span style={{ color: C.border }}>Your question appears here...</span>}
+        {q.qType === "fillinblank" && q.text.includes("____") ? (
+          q.text.split("____").map((part, i, arr) => (
+            <span key={i}>
+              {part}
+              {i < arr.length - 1 && (
+                <span style={{
+                  color: q.correctAnswer ? "#16a34a" : C.purple,
+                  borderBottom: `2.5px solid ${q.correctAnswer ? "#22c55e" : C.purple}`,
+                  padding: "0 4px",
+                  margin: "0 2px",
+                  fontWeight: 700
+                }}>
+                  {q.correctAnswer || "____"}
+                </span>
+              )}
+            </span>
+          ))
+        ) : (
+          q.text || <span style={{ color: C.border }}>Your question appears here...</span>
+        )}
       </div>
-      {isTyped
-        ? <div style={{
-          background: C.white, border: `2px solid ${C.border}`, borderRadius: 9,
-          padding: "9px 12px", fontSize: 13, color: C.muted, fontStyle: "italic"
+      {isTextInput ? (
+        <div style={{
+          background: C.white, border: `2px solid ${C.border}`, borderRadius: 10,
+          padding: "10px 14px", fontSize: 13, color: q.correctAnswer ? C.navy : C.muted, fontStyle: q.correctAnswer ? "normal" : "italic",
+          userSelect: "none"
         }}>
-          Player types their answer here...
+          {q.qType === "fillinblank" ? (
+            q.correctAnswer ? (
+              <span>Player fills: <strong style={{ color: "#16a34a", fontStyle: "normal" }}>{q.correctAnswer}</strong></span>
+            ) : (
+              "Player fills the gap here..."
+            )
+          ) : (
+            q.correctAnswer ? (
+              <span>Player types: <strong style={{ color: "#16a34a", fontStyle: "normal" }}>{q.correctAnswer}</strong></span>
+            ) : (
+              "Player types their answer here..."
+            )
+          )}
         </div>
-        : <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+      ) : isReorder ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {itemsToRender.map((item, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 12px", borderRadius: 10,
+              border: `1.5px solid ${C.border}`, background: C.white,
+              fontSize: 13, fontWeight: 600, userSelect: "none"
+            }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                background: `${C.purple}18`, color: C.purple,
+                fontSize: 11, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                {i + 1}
+              </div>
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, opacity: .35 }}>
+                <circle cx="4" cy="3" r="1.2" fill={C.navy} /><circle cx="10" cy="3" r="1.2" fill={C.navy} />
+                <circle cx="4" cy="7" r="1.2" fill={C.navy} /><circle cx="10" cy="7" r="1.2" fill={C.navy} />
+                <circle cx="4" cy="11" r="1.2" fill={C.navy} /><circle cx="10" cy="11" r="1.2" fill={C.navy} />
+              </svg>
+              <span style={{ flex: 1, color: hasReorderItems ? C.navy : C.border, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {item}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
           {OPTS.map((m, i) => (
             <div key={i} style={{
               background: m.bg, border: `1.5px solid ${m.border}`,
@@ -659,7 +1128,7 @@ function QPreview({ q }) {
             </div>
           ))}
         </div>
-      }
+      )}
     </div>
   );
 }
@@ -1094,7 +1563,7 @@ function LbRow({ p, myName, idx, showScore = true }) {
       }}>
         {p.rank <= 3 ? medals[p.rank - 1] : `#${p.rank}`}
       </span>
-      <Av name={p.name} size={36} />
+      <Av name={p.name} size={36} avatarIndex={p.avatarIndex} />
       <span style={{ flex: 1, fontWeight: 600, fontSize: 16, color: isMe ? C.purple : C.navy }}>
         {p.name}{isMe ? " (you)" : ""}
       </span>
@@ -1134,6 +1603,8 @@ export default function App() {
   const [category, setCategory] = useState("Endless");
   const [customCategory, setCustomCategory] = useState("");   // used when category === "Custom"
   const [themeImage, setThemeImage] = useState("");   // room-level banner image
+  const [roomCategory, setRoomCategory] = useState("Endless");
+  const [roomCustomCategory, setRoomCustomCategory] = useState("");
 
   const [gameState, setGameState] = useState("idle");
   const [currentQ, setCurrentQ] = useState(null);
@@ -1153,6 +1624,18 @@ export default function App() {
   const [errMsg, setErrMsg] = useState("");
   const [typedInput, setTypedInput] = useState("");    // player's typed answer for typed/fillinblank
   const [playerOrder, setPlayerOrder] = useState([]);    // player's drag order for reorder questions
+  const [isTyping, setIsTyping] = useState(true);
+  const [showDoublePointsAnim, setShowDoublePointsAnim] = useState(false);
+  const [myAvatarIdx, setMyAvatarIdx] = useState(0);
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+
+  const selectAvatar = (idx) => {
+    setMyAvatarIdx(idx);
+    setShowAvatarSelector(false);
+    if (socketRef.current) {
+      socketRef.current.emit("update_avatar", { roomCode: roomCode || joinCode.toUpperCase().trim(), avatarIndex: idx });
+    }
+  };
 
   const socketRef = useRef(null);
   const [codeCopied, copyCode] = useCopy();
@@ -1168,6 +1651,8 @@ export default function App() {
 
     s.on("room_created", async ({ roomCode }) => {
       setRoomCode(roomCode);
+      setRoomCategory(category);
+      setRoomCustomCategory(customCategory);
       setScreen("lobby-host");
 
       // Upload each image to the server now that we have the roomCode.
@@ -1188,11 +1673,28 @@ export default function App() {
       }
       delete s._pendingImages;
     });
-    s.on("join_success", ({ roomCode, playerName }) => {
+    s.on("join_success", ({ roomCode, playerName, category: joinedCat, customCategory: joinedCust, avatarIndex }) => {
       setRoomCode(roomCode); setMyName(playerName); myNameRef.current = playerName;
+      setRoomCategory(joinedCat || "Endless");
+      setRoomCustomCategory(joinedCust || "");
+      if (typeof avatarIndex === 'number') {
+        setMyAvatarIdx(avatarIndex);
+      }
       setScreen("lobby-player"); SFX.join();
     });
-    s.on("player_joined", ({ players }) => setPlayers(players));
+    s.on("player_joined", ({ players, newPlayerName }) => {
+      setPlayers(players);
+      if (newPlayerName && newPlayerName !== myNameRef.current) {
+        try {
+          const utterance = new SpeechSynthesisUtterance(`${newPlayerName} has joined the room`);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.05;
+          window.speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.warn("Speech synthesis error:", e);
+        }
+      }
+    });
     s.on("quiz_started", () => { setScreen("game"); setGameState("starting"); setMyScore(0); SFX.start(); });
 
     s.on("new_question", q => {
@@ -1212,6 +1714,19 @@ export default function App() {
       // For reorder questions: playerOrder starts as the server-shuffled options
       setPlayerOrder(q.options || []);
       setNextCdSecs(null);
+
+      // Typewriter and Double Points overlay triggers
+      setIsTyping(true);
+      const isLastQ = (q.questionIndex === q.totalQuestions - 1) && (q.totalQuestions > 1);
+      if (isLastQ) {
+        setShowDoublePointsAnim(true);
+        setTimeout(() => {
+          setShowDoublePointsAnim(false);
+        }, 2500);
+      } else {
+        setShowDoublePointsAnim(false);
+      }
+
       setGameState("question");
     });
 
@@ -1314,14 +1829,16 @@ export default function App() {
     // Attach images to socket so the room_created handler can send them
     s._pendingImages = rawImages;
 
-    s.emit("create_room", { hostName: hostName.trim(), questions: qs });
+    s.emit("create_room", { hostName: hostName.trim(), questions: qs, category, customCategory });
   }
   function doJoin() {
     if (!playerName.trim()) { showErr("Enter your name"); return; }
     if (joinCode.trim().length < 4) { showErr("Enter the room code"); return; }
     const s = setupSocket(); setRole("player");
     setMyName(playerName.trim()); myNameRef.current = playerName.trim();
-    s.emit("join_room", { roomCode: joinCode.toUpperCase().trim(), playerName: playerName.trim() });
+    const autoIdx = playerName.trim() ? (playerName.trim().charCodeAt(0) + playerName.trim().length) % AVATARS.length : 0;
+    setMyAvatarIdx(autoIdx);
+    s.emit("join_room", { roomCode: joinCode.toUpperCase().trim(), playerName: playerName.trim(), avatarIndex: autoIdx });
   }
   function doAnswer(ans) {
     if (lockedAns || revealed) return;
@@ -1335,53 +1852,116 @@ export default function App() {
     setRevealed(false); setQResult(null); setFeedback("");
     setQuestions([{ text: "", correctAnswer: "", incorrectAnswers: ["", "", ""], timeLimit: 10, image: "", qType: "mcq", reorderItems: ["", "", ""] }]);
     setQuizTitle(""); setCustomCategory(""); setThemeImage("");
+    setRoomCategory("Endless"); setRoomCustomCategory("");
+    setJoinCode("");
   }
 
   const shareLink = `endplays.xyz/join/${roomCode}`;
 
+  function handleLogoClick() {
+    const activeSession = ["lobby-host", "lobby-player", "game"].includes(screen);
+    if (activeSession) {
+      const msg = role === "host"
+        ? "You are hosting the quiz. If you leave, the room will be closed. Are you sure you want to leave?"
+        : "Are you sure you want to leave the current quiz room?";
+      if (!window.confirm(msg)) return;
+    }
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    setScreen("home"); setGameState("idle"); setRoomCode(""); setPlayers([]);
+    setLeaderboard([]); setMyScore(0); setCurrentQ(null); setLockedAns(null);
+    setRevealed(false); setQResult(null); setFeedback("");
+    setQuestions([{ text: "", correctAnswer: "", incorrectAnswers: ["", "", ""], timeLimit: 10, image: "", qType: "mcq", reorderItems: ["", "", ""] }]);
+    setQuizTitle(""); setCustomCategory(""); setThemeImage("");
+    setRoomCategory("Endless"); setRoomCustomCategory("");
+    setJoinCode("");
+  }
+
   const Nav = ({ right }) => (
-    <nav style={{
-      background: "rgba(255,255,255,.94)", backdropFilter: "blur(12px)",
-      borderBottom: `1.5px solid ${C.border}55`, padding: "0 28px", height: 64,
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 16px rgba(124,92,250,.07)"
-    }}>
-      <Logo size={30} />{right}
+    <nav className="navbar">
+      <Logo size={30} onClick={handleLogoClick} />{right}
     </nav>
   );
 
-  const Footer = () => (
-    <footer style={{
-      background: C.navy, color: "rgba(255,255,255,.5)",
-      padding: "24px 28px", textAlign: "center", fontSize: 14, fontWeight: 400
-    }}>
-      <div style={{ marginBottom: 8 }}>
-        Built on <span style={{
-          background: C.grad, WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent", fontWeight: 700
-        }}>EndPlays</span>
-        {" "}— Real-time multiplayer quizzes
-      </div>
-      <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 13 }}>
-        {["Twitter", "Discord", "GitHub"].map(s => (
-          <a key={s} href="#" style={{ color: "rgba(255,255,255,.4)", textDecoration: "none", transition: "color .2s" }}
-            onMouseEnter={e => e.target.style.color = "#fff"}
-            onMouseLeave={e => e.target.style.color = "rgba(255,255,255,.4)"}>{s}</a>
-        ))}
-      </div>
-    </footer>
-  );
+  const Footer = () => {
+    const links = [
+      { name: "X", url: "https://x.com/EndlessProtocol" },
+      { name: "Discord", url: "https://discord.gg/endlessprotocol" },
+      { name: "GitHub", url: "https://github.com/endless-labs" }
+    ];
+    return (
+      <footer style={{
+        background: C.navy, color: "rgba(255,255,255,.5)",
+        padding: "24px 28px", textAlign: "center", fontSize: 14, fontWeight: 400,
+        position: "relative"
+      }}>
+        <div style={{ marginBottom: 8 }}>
+          Built on <span style={{
+            background: C.grad, WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent", fontWeight: 700
+          }}>EndPlays Quiz</span>
+          {" "}— Real-time multiplayer quizzes
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 13 }}>
+          {links.map(l => (
+            <a key={l.name} href={l.url} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,.4)", textDecoration: "none", transition: "color .2s" }}
+              onMouseEnter={e => e.target.style.color = "#fff"}
+              onMouseLeave={e => e.target.style.color = "rgba(255,255,255,.4)"}>{l.name}</a>
+          ))}
+        </div>
+
+        {/* Made by signature */}
+        <div style={{
+          position: "absolute", bottom: 20, right: 28,
+          display: "flex", alignItems: "center", gap: 8, fontSize: 14
+        }} className="footer-sig">
+          <span style={{
+            background: C.grad, WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent", fontWeight: 700
+          }}>Made by</span>
+          <a href="https://x.com/RajGupta0510" target="_blank" rel="noopener noreferrer" style={{
+            display: "flex", alignItems: "center", textDecoration: "none", outline: "none"
+          }}>
+            <img src="/raj_avatar.jpg" alt="Raj Gupta" style={{
+              width: 22, height: 22, borderRadius: "50%",
+              border: "1.5px solid rgba(255,255,255,0.8)",
+              boxShadow: "0 0 8px rgba(255,255,255,0.25), 0 0 15px rgba(124,92,250,0.3)",
+              transition: "transform 0.2s, box-shadow 0.2s",
+              cursor: "pointer"
+            }}
+            onMouseEnter={e => {
+              e.target.style.transform = "scale(1.15)";
+              e.target.style.boxShadow = "0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,78,195,0.5)";
+            }}
+            onMouseLeave={e => {
+              e.target.style.transform = "scale(1)";
+              e.target.style.boxShadow = "0 0 8px rgba(255,255,255,0.25), 0 0 15px rgba(124,92,250,0.3)";
+            }} />
+          </a>
+        </div>
+      </footer>
+    );
+  };
 
   // ════════════════════════════════════════════════════════════════════════════
   // HOME
   // ════════════════════════════════════════════════════════════════════════════
   if (screen === "home") return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", position: "relative" }}>
       <GCss />
+      <ThemeBg category="Endless" />
       <Nav right={
-        <div style={{ display: "flex", gap: 10 }}>
-          <Btn v="outline" full={false} sz="sm" onClick={() => setScreen("join")}>Join Game</Btn>
-          <Btn v="primary" full={false} sz="sm" onClick={() => setScreen("host-setup")}>Host a Quiz</Btn>
+        <div className="nav-btn-container">
+          <Btn v="outline" full={false} sz="sm" onClick={() => setScreen("join")}>
+            <span className="btn-text-long">Join Game</span>
+            <span className="btn-text-short">Join</span>
+          </Btn>
+          <Btn v="primary" full={false} sz="sm" onClick={() => setScreen("host-setup")}>
+            <span className="btn-text-long">Host a Quiz</span>
+            <span className="btn-text-short">Host</span>
+          </Btn>
         </div>
       } />
 
@@ -1391,12 +1971,21 @@ export default function App() {
         textAlign: "center", overflow: "hidden"
       }}>
         <BgShapes />
+        {/* Floating backdrop particles from ThemeBg will drift over the entire page */}
         <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
-          <div className="hero-h fu" style={{
-            fontWeight: 700, fontSize: 54, color: "#fff",
-            lineHeight: 1.08, marginBottom: 18, letterSpacing: ".01em"
-          }}>
-            Play fun quizzes<br />with friends
+          <div className="hero-flank-container fu">
+            {/* <div className="hero-decor">
+              <Crown3D />
+            </div> */}
+            <div className="hero-h" style={{
+              fontWeight: 700, fontSize: 54, color: "#fff",
+              lineHeight: 1.08, letterSpacing: ".01em"
+            }}>
+              Play fun quizzes<br />with friends
+            </div>
+            {/* <div className="hero-decor">
+              <Trophy3D />
+            </div> */}
           </div>
           <div className="fu" style={{
             fontSize: 17, color: "rgba(255,255,255,.86)", fontWeight: 400,
@@ -1509,7 +2098,7 @@ export default function App() {
       minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", padding: 24, position: "relative"
     }}>
-      <GCss /><BgShapes />
+      <GCss /><ThemeBg category="Endless" />
       <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }} className="pop">
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <Logo size={40} />
@@ -1520,7 +2109,7 @@ export default function App() {
         <Card style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <ErrBox msg={errMsg} />
           <div><Lbl>Your Name</Lbl>
-            <Inp ph="What's your name?" val={playerName} set={setPlayerName} autoFocus /></div>
+            <Inp ph="What's your name?" val={playerName} set={setPlayerName} kd={e => e.key === "Enter" && doJoin()} autoFocus /></div>
           <div><Lbl>Room Code</Lbl>
             <Inp ph="e.g. AB12CD" val={joinCode} set={v => setJoinCode(v.toUpperCase())}
               kd={e => e.key === "Enter" && doJoin()} ml={6}
@@ -1554,43 +2143,45 @@ export default function App() {
             <div><Lbl>Quiz Title</Lbl>
               <Inp ph="e.g. Science Challenge..." val={quizTitle} set={setQuizTitle} /></div>
           </div>
-          <div>
-            <Lbl>Category</Lbl>
-            {/* Icon-based category picker */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-              {CATEGORIES.map(c => {
-                const active = category === c.label;
-                return (
-                  <button key={c.label} onClick={() => setCategory(c.label)}
-                    style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                      padding: "8px 4px", borderRadius: 10, border: `2px solid ${active ? C.purple : C.border}`,
-                      background: active ? `${C.purple}10` : "#fafaff", cursor: "pointer",
-                      transition: "all .15s", outline: "none"
-                    }}>
-                    <span style={{ lineHeight: 1 }}>{CAT_ICONS[c.label]}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: active ? 700 : 500,
-                      color: active ? C.purple : C.muted, letterSpacing: ".02em"
-                    }}>
-                      {c.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {/* Custom category text input — only visible when Custom is selected */}
-            {category === "Custom" && (
-              <div style={{ marginTop: 10 }}>
-                <Inp ph="Enter your custom category name..."
-                  val={customCategory} set={setCustomCategory} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }} className="g2">
+            <div>
+              <Lbl>Category</Lbl>
+              {/* Icon-based category picker */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+                {CATEGORIES.map(c => {
+                  const active = category === c.label;
+                  return (
+                    <button key={c.label} onClick={() => setCategory(c.label)}
+                      style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                        padding: "8px 4px", borderRadius: 10, border: `2px solid ${active ? C.purple : C.border}`,
+                        background: active ? `${C.purple}10` : "#fafaff", cursor: "pointer",
+                        transition: "all .15s", outline: "none"
+                      }}>
+                      <span style={{ lineHeight: 1 }}>{CAT_ICONS[c.label]}</span>
+                      <span style={{
+                        fontSize: 10, fontWeight: active ? 700 : 500,
+                        color: active ? C.purple : C.muted, letterSpacing: ".02em"
+                      }}>
+                        {c.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
-          {/* Fix 4: Room theme image upload */}
-          <div style={{ marginTop: 16 }}>
-            <Lbl>Room Theme Image (optional — shown as banner in lobby)</Lbl>
-            <ThemeImgUploader value={themeImage} onChange={setThemeImage} />
+              {/* Custom category text input — only visible when Custom is selected */}
+              {category === "Custom" && (
+                <div style={{ marginTop: 10 }}>
+                  <Inp ph="Enter your custom category name..."
+                    val={customCategory} set={setCustomCategory} />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Lbl>Room Theme Image (optional — banner in lobby)</Lbl>
+              <ThemeImgUploader value={themeImage} onChange={setThemeImage} />
+            </div>
           </div>
         </Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1626,10 +2217,11 @@ export default function App() {
         {themeImage && (
           <div style={{
             borderRadius: 18, overflow: "hidden", border: `1.5px solid ${C.border}`,
-            boxShadow: "0 2px 16px rgba(124,92,250,.1)"
+            boxShadow: "0 2px 16px rgba(124,92,250,.1)",
+            height: 180, width: "100%"
           }}>
             <img src={themeImage} alt="Quiz theme"
-              style={{ width: "100%", maxHeight: 180, objectFit: "cover", display: "block" }} />
+              style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} />
           </div>
         )}
 
@@ -1696,7 +2288,7 @@ export default function App() {
                   padding: "12px 14px", display: "flex", alignItems: "center", gap: 8,
                   animationDelay: `${i * .05}s`
                 }}>
-                  <Av name={p.name} size={32} />
+                  <Av name={p.name} size={32} avatarIndex={p.avatarIndex} />
                   <span style={{
                     fontWeight: 600, fontSize: 14, color: C.navy,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
@@ -1747,7 +2339,7 @@ export default function App() {
       minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", padding: 24, position: "relative"
     }}>
-      <GCss /><BgShapes />
+      <GCss /><ThemeBg category={roomCategory} />
       <div style={{
         width: "100%", maxWidth: 520, display: "flex", flexDirection: "column",
         gap: 18, position: "relative", zIndex: 1
@@ -1756,10 +2348,11 @@ export default function App() {
         {themeImage && (
           <div style={{
             borderRadius: 18, overflow: "hidden", border: `1.5px solid rgba(255,255,255,.25)`,
-            boxShadow: "0 4px 20px rgba(124,92,250,.2)"
+            boxShadow: "0 4px 20px rgba(124,92,250,.2)",
+            height: 180, width: "100%"
           }}>
             <img src={themeImage} alt="Quiz theme"
-              style={{ width: "100%", maxHeight: 160, objectFit: "cover", display: "block" }} />
+              style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} />
           </div>
         )}
         <GCard cls="pop" style={{ textAlign: "center", padding: "32px 28px" }}>
@@ -1772,7 +2365,18 @@ export default function App() {
             fontSize: 66, color: "#fff", letterSpacing: ".4em", lineHeight: 1
           }}>{roomCode}</div>
           <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <Av name={myName} size={36} />
+            <div style={{ position: "relative", cursor: "pointer" }} onClick={() => setShowAvatarSelector(true)}>
+              <Av name={myName} size={48} avatarIndex={myAvatarIdx} />
+              <div style={{
+                position: "absolute", bottom: -2, right: -2, background: C.pink, borderRadius: "50%",
+                width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "1.5px solid #fff", boxShadow: "0 1px 4px rgba(0,0,0,0.2)"
+              }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+              </div>
+            </div>
             <span style={{
               background: "rgba(255,255,255,.22)", color: "#fff", borderRadius: 20,
               padding: "5px 18px", fontSize: 16, fontWeight: 600
@@ -1797,7 +2401,9 @@ export default function App() {
                     borderRadius: 13, animationDelay: `${i * .04}s`,
                     boxShadow: isMe ? `0 0 0 2px ${C.purple}22` : undefined
                   }}>
-                  <Av name={p.name} size={34} />
+                  <div style={{ cursor: isMe ? "pointer" : "default" }} onClick={isMe ? () => setShowAvatarSelector(true) : undefined}>
+                    <Av name={p.name} size={34} avatarIndex={isMe ? myAvatarIdx : p.avatarIndex} />
+                  </div>
                   <span style={{ fontWeight: 600, fontSize: 15, color: isMe ? C.purple : C.navy }}>
                     {p.name}{isMe ? " (you)" : ""}
                   </span>
@@ -1820,6 +2426,64 @@ export default function App() {
             ))}
           </div>
         </div>
+
+        {showAvatarSelector && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 99999,
+            background: "rgba(10,8,22,0.85)", display: "flex",
+            alignItems: "center", justifyContent: "center", padding: 20,
+            backdropFilter: "blur(8px)"
+          }}>
+            <div className="pop" style={{
+              background: C.white, borderRadius: 24, padding: "28px 24px",
+              width: "100%", maxWidth: 440, border: `2px solid ${C.purple}22`,
+              boxShadow: "0 20px 40px rgba(124,92,250,0.15)",
+              animation: "popIn .3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <span style={{ fontFamily: "'Fredoka',sans-serif", fontSize: 22, fontWeight: 700, color: C.navy }}>
+                  Choose Your Character
+                </span>
+                <button 
+                  onClick={() => setShowAvatarSelector(false)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    fontSize: 20, color: C.muted, fontWeight: 600,
+                    padding: 4, display: "flex", alignItems: "center", justifyContent: "center"
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div style={{
+                display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 12, maxHeight: 320, overflowY: "auto", padding: "4px 2px"
+              }}>
+                {AVATARS.map((avSvg, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => selectAvatar(idx)}
+                    style={{
+                      background: "none", border: `3px solid ${myAvatarIdx === idx ? C.purple : "transparent"}`,
+                      borderRadius: "50%", padding: 0, cursor: "pointer",
+                      transition: "transform 0.2s, border-color 0.2s",
+                      outline: "none", overflow: "hidden", display: "block",
+                      transform: myAvatarIdx === idx ? "scale(1.08)" : "none",
+                      boxShadow: myAvatarIdx === idx ? "0 4px 12px rgba(124,92,250,0.35)" : "none"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = myAvatarIdx === idx ? "scale(1.08)" : "none"; }}
+                  >
+                    <div style={{ width: "100%", height: "100%", padding: 2 }}>
+                      {avSvg}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1835,13 +2499,14 @@ export default function App() {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
         <GCss />
+        <ThemeBg category={roomCategory} />
         <div style={{
           background: "rgba(255,255,255,.94)", backdropFilter: "blur(12px)",
           borderBottom: `1.5px solid ${C.border}55`, padding: "0 22px", height: 56,
           display: "flex", alignItems: "center", justifyContent: "space-between",
           position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 10px rgba(124,92,250,.06)"
         }}>
-          <Logo size={22} />
+          <Logo size={22} onClick={handleLogoClick} />
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             {currentQ && <Pill color={C.muted}>Q{currentQ.questionIndex + 1}/{currentQ.totalQuestions}</Pill>}
             <Pill color={C.yellow}>{myScore.toLocaleString()} pts</Pill>
@@ -1851,8 +2516,68 @@ export default function App() {
 
         <div style={{
           maxWidth: 680, margin: "0 auto", padding: "18px 18px 40px",
-          display: "flex", flexDirection: "column", gap: 14, width: "100%"
+          display: "flex", flexDirection: "column", gap: 14, width: "100%",
+          position: "relative", zIndex: 1
         }}>
+          {showDoublePointsAnim && (
+            <div className="pop" style={{
+              position: "fixed", inset: 0, zIndex: 9999,
+              background: "rgba(10,8,22,0.96)",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              textAlign: "center", padding: 32,
+              backdropFilter: "blur(12px)"
+            }}>
+              <div style={{
+                position: "absolute", inset: 0,
+                background: `radial-gradient(circle at center, ${C.purple}22 0%, transparent 60%)`,
+                animation: "pulseGlow 2.5s infinite alternate"
+              }} />
+              <div className="pop" style={{ 
+                position: "relative", zIndex: 1, maxWidth: 540,
+                background: "rgba(255,255,255,0.03)",
+                border: `2px solid ${C.yellow}77`,
+                borderRadius: 28,
+                padding: "48px 36px",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.05)"
+              }}>
+                <div style={{ fontSize: 72, animation: "bounce 0.8s infinite alternate", marginBottom: 20 }}>🏆</div>
+                <h2 style={{
+                  fontFamily: "'Fredoka',sans-serif",
+                  fontSize: 42,
+                  fontWeight: 800,
+                  color: C.yellow,
+                  textShadow: `0 0 30px ${C.yellow}66`,
+                  margin: "0 0 8px 0",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.02em"
+                }}>
+                  Final Question
+                </h2>
+                <div style={{
+                  fontFamily: "'Fredoka',sans-serif",
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: "#fff",
+                  margin: "0 0 24px 0",
+                  letterSpacing: "0.02em"
+                }}>
+                  Double Points!
+                </div>
+                <div style={{
+                  display: "inline-block",
+                  fontSize: 20, fontWeight: 700, color: "#fff",
+                  background: C.grad, padding: "14px 42px", borderRadius: 20,
+                  boxShadow: `0 12px 32px ${C.purple}55`,
+                  letterSpacing: ".05em", animation: "wobble 2s infinite"
+                }}>
+                  ⚡ GET READY ⚡
+                </div>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 16, fontWeight: 500, marginTop: 24 }}>
+                  Answers in this round are worth 2x points!
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Starting */}
           {gameState === "starting" && (
@@ -1868,7 +2593,7 @@ export default function App() {
           )}
 
           {/* Question + options */}
-          {(gameState === "question" || gameState === "result") && currentQ && (
+          {(gameState === "question" || gameState === "result") && currentQ && !showDoublePointsAnim && (
             <>
               {/* Timer bar */}
               {gameState === "question" && (
@@ -1910,7 +2635,11 @@ export default function App() {
                       fontSize: "clamp(18px,3.8vw,26px)", fontWeight: 600,
                       color: C.navy, lineHeight: 1.35
                     }}>
-                      {currentQ.text}
+                      {gameState === "question" && !revealed ? (
+                        <Typewriter text={currentQ.text} speed={20} onComplete={() => setIsTyping(false)} />
+                      ) : (
+                        currentQ.text
+                      )}
                     </div>
                   </div>
                   {gameState === "question" && (
@@ -1946,182 +2675,169 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── MCQ: coloured option buttons ── */}
-              {currentQ.qType === "mcq" && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="g4">
-                  {currentQ.options.map((opt, idx) => {
-                    const m = OPTS[idx % 4];
-                    const isLocked = !!lockedAns || revealed;
-                    const isPicked = lockedAns === opt;
+              {!isTyping || revealed ? (
+                <>
+                  {/* ── MCQ: coloured option buttons ── */}
+                  {currentQ.qType === "mcq" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="g4">
+                      {currentQ.options.map((opt, idx) => {
+                        const m = OPTS[idx % 4];
+                        const isLocked = !!lockedAns || revealed;
+                        const isPicked = lockedAns === opt;
 
-                    let bg = m.bg, border = m.border, textCol = C.navy, opacity = 1, shape = m.shape;
-                    let shadow = `0 2px 10px ${m.color}1a`;
-                    let anim = undefined;
+                        let bg = m.bg, border = m.border, textCol = C.navy, opacity = 1, shape = m.shape;
+                        let shadow = `0 2px 10px ${m.color}1a`;
+                        let anim = undefined;
 
-                    if (revealed && qResult) {
-                      if (opt === qResult.correctAnswer) {
-                        bg = "#d1fae5"; border = "#22c55e"; textCol = "#15803d"; shape = "✓";
-                        shadow = "0 4px 18px rgba(34,197,94,.28)";
-                        anim = "revealOpt .35s ease both";
-                      } else if (isPicked) {
-                        bg = "#fee2e2"; border = C.red; textCol = "#b91c1c"; shape = "✗";
-                        shadow = `0 4px 18px rgba(255,77,77,.22)`;
-                        anim = "revealOpt .35s ease both";
-                      } else {
-                        opacity = 0.22;
-                      }
-                    } else if (lockedAns !== null) {
-                      if (isPicked) {
-                        bg = m.color + "20"; border = m.color; shape = "•";
-                        shadow = `0 4px 16px ${m.color}33`;
-                        anim = "lockPulse 1.6s ease-in-out infinite";
-                      } else {
-                        opacity = 0.38; bg = C.bg; border = C.border;
-                      }
-                    }
+                        if (revealed && qResult) {
+                          if (opt === qResult.correctAnswer) {
+                            bg = "#d1fae5"; border = "#22c55e"; textCol = "#15803d"; shape = "✓";
+                            shadow = "0 4px 18px rgba(34,197,94,.28)";
+                            anim = "revealOpt .35s ease both";
+                          } else if (isPicked) {
+                            bg = "#fee2e2"; border = C.red; textCol = "#b91c1c"; shape = "✗";
+                            shadow = `0 4px 18px rgba(255,77,77,.22)`;
+                            anim = "revealOpt .35s ease both";
+                          } else {
+                            opacity = 0.22;
+                          }
+                        } else if (lockedAns !== null) {
+                          if (isPicked) {
+                            bg = m.color + "20"; border = m.color; shape = "•";
+                            shadow = `0 4px 16px ${m.color}33`;
+                            anim = "lockPulse 1.6s ease-in-out infinite";
+                          } else {
+                            opacity = 0.38; bg = C.bg; border = C.border;
+                          }
+                        }
 
-                    return (
-                      <button key={opt}
-                        className={!isLocked ? "opt-b" : ""}
-                        onClick={!isLocked ? () => doAnswer(opt) : undefined}
-                        style={{
-                          padding: "clamp(14px,2.5vw,20px) 14px", borderRadius: 18,
-                          border: `2px solid ${border}`, cursor: isLocked ? "default" : "pointer",
-                          background: bg, opacity, color: textCol,
-                          textAlign: "left", display: "flex", alignItems: "center", gap: 10,
-                          boxShadow: shadow, transition: "background .2s ease, border-color .2s ease, opacity .2s ease",
-                          fontFamily: "'Fredoka',sans-serif",
-                          animation: anim,
-                          animationDelay: revealed ? `${idx * .07}s` : undefined,
-                        }}>
-                        <span style={{
-                          background: m.color + "24", borderRadius: 9,
-                          width: 32, height: 32, flexShrink: 0,
-                          color: revealed && opt === qResult?.correctAnswer ? "#16a34a" : m.color,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 15, fontWeight: 700
-                        }}>
-                          {shape}
-                        </span>
-                        <span style={{ fontSize: "clamp(13px,2.2vw,15px)", fontWeight: 600, lineHeight: 1.3 }}>
-                          {opt}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ── TYPED + FILL IN BLANK: text input box ── */}
-              {(currentQ.qType === "typed" || currentQ.qType === "fillinblank") && (
-                <div className="pop">
-                  {/* Fill-in-blank: render sentence with styled blank */}
-                  {currentQ.qType === "fillinblank" && !revealed && (
-                    <div style={{
-                      padding: "14px 18px", borderRadius: 14, background: `${C.purple}07`,
-                      border: `1.5px solid ${C.purple}22`, marginBottom: 12,
-                      fontSize: 17, fontWeight: 600, color: C.navy, lineHeight: 1.6
-                    }}>
-                      {currentQ.text.split("____").map((part, i, arr) => (
-                        <span key={i}>
-                          {part}
-                          {i < arr.length - 1 && (
-                            <span style={{
-                              display: "inline-block", minWidth: 80, borderBottom: `2.5px solid ${C.purple}`,
-                              marginInline: 4, verticalAlign: "bottom", height: 24,
-                              background: lockedAns ? `${C.purple}10` : "transparent",
-                              borderRadius: "4px 4px 0 0", padding: "0 6px",
-                              color: C.purple, fontWeight: 700, textAlign: "center", lineHeight: "22px"
+                        return (
+                          <button key={opt}
+                            className={!isLocked ? "opt-b" : ""}
+                            onClick={!isLocked ? () => doAnswer(opt) : undefined}
+                            style={{
+                              padding: "clamp(14px,2.5vw,20px) 14px", borderRadius: 18,
+                              border: `2px solid ${border}`, cursor: isLocked ? "default" : "pointer",
+                              background: bg, opacity, color: textCol,
+                              textAlign: "left", display: "flex", alignItems: "center", gap: 10,
+                              boxShadow: shadow, transition: "background .2s ease, border-color .2s ease, opacity .2s ease",
+                              fontFamily: "'Fredoka',sans-serif",
+                              animation: anim,
+                              animationDelay: revealed ? `${idx * .07}s` : undefined,
                             }}>
-                              {lockedAns || ""}
+                            <span style={{
+                              background: m.color + "24", borderRadius: 9,
+                              width: 32, height: 32, flexShrink: 0,
+                              color: revealed && opt === qResult?.correctAnswer ? "#16a34a" : m.color,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 15, fontWeight: 700
+                            }}>
+                              {shape}
                             </span>
-                          )}
-                        </span>
-                      ))}
+                            <span style={{ fontSize: "clamp(13px,2.2vw,15px)", fontWeight: 600, lineHeight: 1.3 }}>
+                              {opt}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
-                  {/* Input or result reveal */}
-                  {!revealed
-                    ? <div style={{ display: "flex", gap: 10 }}>
-                      <input
-                        value={typedInput}
-                        onChange={e => { if (!lockedAns) setTypedInput(e.target.value); }}
-                        onKeyDown={e => { if (e.key === "Enter" && !lockedAns && typedInput.trim()) doAnswer(typedInput.trim()); }}
-                        disabled={!!lockedAns}
-                        placeholder={
-                          lockedAns ? "Answer locked — waiting for timer..." :
-                            currentQ.qType === "fillinblank" ? "Type the missing word..." :
-                              "Type your answer and press Enter..."
-                        }
-                        autoFocus
-                        style={{
-                          flex: 1, padding: "16px 18px", borderRadius: 14, fontSize: 17, fontWeight: 600,
-                          border: `2px solid ${lockedAns ? C.purple : C.border}`,
-                          background: lockedAns ? `${C.purple}08` : "#fafaff",
-                          color: C.navy, outline: "none", transition: "all .2s",
-                          animation: lockedAns ? "lockPulse 1.6s ease-in-out infinite" : undefined,
-                          fontFamily: "'Fredoka',sans-serif",
-                        }}
-                      />
-                      {!lockedAns && (
-                        <button
-                          onClick={() => { if (typedInput.trim()) doAnswer(typedInput.trim()); }}
-                          disabled={!typedInput.trim()}
-                          style={{
-                            padding: "16px 24px", borderRadius: 14, border: "none",
-                            background: typedInput.trim() ? C.grad : "#e2e8f0",
-                            color: typedInput.trim() ? "#fff" : C.muted,
-                            fontSize: 15, fontWeight: 700,
-                            cursor: typedInput.trim() ? "pointer" : "not-allowed",
-                            transition: "all .2s", fontFamily: "'Fredoka',sans-serif"
-                          }}>
-                          Lock In
-                        </button>
-                      )}
-                    </div>
-                    : <div style={{ display: "flex", flexDirection: "column", gap: 10 }} className="pop">
-                      <div style={{
-                        padding: "14px 18px", borderRadius: 14,
-                        background: fbOk ? "#d1fae5" : "#fee2e2",
-                        border: `2px solid ${fbOk ? "#22c55e" : C.red}`,
-                        display: "flex", alignItems: "center", gap: 12
-                      }}>
-                        <span style={{ fontSize: 20 }}>{fbOk ? "✓" : "✗"}</span>
-                        <div>
-                          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 2 }}>Your answer</div>
-                          <div style={{ fontSize: 16, fontWeight: 600, color: fbOk ? "#15803d" : "#b91c1c" }}>
-                            {lockedAns || "(no answer)"}
-                          </div>
-                        </div>
-                      </div>
-                      {!fbOk && qResult && (
-                        <div style={{
-                          padding: "14px 18px", borderRadius: 14,
-                          background: "#d1fae5", border: "2px solid #22c55e",
-                          display: "flex", alignItems: "center", gap: 12
-                        }}>
-                          <span style={{ fontSize: 20 }}>✓</span>
-                          <div>
-                            <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 2 }}>Correct answer</div>
-                            <div style={{ fontSize: 16, fontWeight: 600, color: "#15803d" }}>{qResult.correctAnswer}</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  }
-                </div>
-              )}
 
-              {/* ── REORDER: drag-and-drop list ── */}
-              {currentQ.qType === "reorder" && (
-                <ReorderPlayer
-                  items={currentQ.options}
-                  correctOrder={qResult?.correctOrder || null}
-                  lockedAns={lockedAns}
-                  revealed={revealed}
-                  qResult={qResult}
-                  onSubmit={orderStr => doAnswer(orderStr)}
-                />
+                  {/* ── TYPED + FILL IN BLANK: text input box ── */}
+                  {(currentQ.qType === "typed" || currentQ.qType === "fillinblank") && (
+                    <div className="pop">
+                      {/* Input or result reveal */}
+                      {!revealed
+                        ? <div style={{ display: "flex", gap: 10 }}>
+                          <input
+                            value={typedInput}
+                            onChange={e => { if (!lockedAns) setTypedInput(e.target.value); }}
+                            onKeyDown={e => { if (e.key === "Enter" && !lockedAns && typedInput.trim()) doAnswer(typedInput.trim()); }}
+                            disabled={!!lockedAns}
+                            placeholder={
+                              lockedAns ? "Answer locked — waiting for timer..." :
+                                currentQ.qType === "fillinblank" ? "Type the missing word..." :
+                                  "Type your answer and press Enter..."
+                            }
+                            autoFocus
+                            style={{
+                              flex: 1, padding: "16px 18px", borderRadius: 14, fontSize: 17, fontWeight: 600,
+                              border: `2px solid ${lockedAns ? C.purple : C.border}`,
+                              background: lockedAns ? `${C.purple}08` : "#fafaff",
+                              color: C.navy, outline: "none", transition: "all .2s",
+                              animation: lockedAns ? "lockPulse 1.6s ease-in-out infinite" : undefined,
+                              fontFamily: "'Fredoka',sans-serif",
+                            }}
+                          />
+                          {!lockedAns && (
+                            <button
+                              onClick={() => { if (typedInput.trim()) doAnswer(typedInput.trim()); }}
+                              disabled={!typedInput.trim()}
+                              style={{
+                                padding: "16px 24px", borderRadius: 14, border: "none",
+                                background: typedInput.trim() ? C.grad : "#e2e8f0",
+                                color: typedInput.trim() ? "#fff" : C.muted,
+                                fontSize: 15, fontWeight: 700,
+                                cursor: typedInput.trim() ? "pointer" : "not-allowed",
+                                transition: "all .2s", fontFamily: "'Fredoka',sans-serif"
+                              }}>
+                              Lock In
+                            </button>
+                          )}
+                        </div>
+                        : <div style={{ display: "flex", flexDirection: "column", gap: 10 }} className="pop">
+                          <div style={{
+                            padding: "14px 18px", borderRadius: 14,
+                            background: fbOk ? "#d1fae5" : "#fee2e2",
+                            border: `2px solid ${fbOk ? "#22c55e" : C.red}`,
+                            display: "flex", alignItems: "center", gap: 12
+                          }}>
+                            <span style={{ fontSize: 20 }}>{fbOk ? "✓" : "✗"}</span>
+                            <div>
+                              <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 2 }}>Your answer</div>
+                              <div style={{ fontSize: 16, fontWeight: 600, color: fbOk ? "#15803d" : "#b91c1c" }}>
+                                {lockedAns || "(no answer)"}
+                              </div>
+                            </div>
+                          </div>
+                          {!fbOk && qResult && (
+                            <div style={{
+                              padding: "14px 18px", borderRadius: 14,
+                              background: "#d1fae5", border: "2px solid #22c55e",
+                              display: "flex", alignItems: "center", gap: 12
+                            }}>
+                              <span style={{ fontSize: 20 }}>✓</span>
+                              <div>
+                                <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 2 }}>Correct answer</div>
+                                <div style={{ fontSize: 16, fontWeight: 600, color: "#15803d" }}>{qResult.correctAnswer}</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      }
+                    </div>
+                  )}
+
+                  {/* ── REORDER: drag-and-drop list ── */}
+                  {currentQ.qType === "reorder" && (
+                    <ReorderPlayer
+                      items={currentQ.options}
+                      correctOrder={qResult?.correctOrder || null}
+                      lockedAns={lockedAns}
+                      revealed={revealed}
+                      qResult={qResult}
+                      onSubmit={orderStr => doAnswer(orderStr)}
+                    />
+                  )}
+                </>
+              ) : (
+                <div style={{
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  padding: "48px 0", color: C.muted, fontWeight: 600, fontSize: 16,
+                  fontStyle: "italic", animation: "pulseGlow 1.2s infinite"
+                }}>
+                  Reading question...
+                </div>
               )}
             </>
           )}
@@ -2208,7 +2924,7 @@ export default function App() {
         minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center", padding: 24, position: "relative"
       }}>
-        <GCss /><BgShapes />
+        <GCss /><ThemeBg category={roomCategory} />
         <div style={{
           width: "100%", maxWidth: 560, display: "flex", flexDirection: "column",
           gap: 18, position: "relative", zIndex: 1

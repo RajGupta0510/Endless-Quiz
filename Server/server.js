@@ -39,7 +39,7 @@ function generateCode() {
 
 function getLeaderboard(room) {
   return Object.entries(room.players)
-    .map(([id, p]) => ({ id, name: p.name, score: p.score }))
+    .map(([id, p]) => ({ id, name: p.name, score: p.score, avatarIndex: p.avatarIndex }))
     .sort((a, b) => b.score - a.score)
     .map((p, i) => ({ ...p, rank: i + 1 }));
 }
@@ -66,7 +66,7 @@ function endQuestion(roomCode) {
 
   const question      = room.questions[room.currentQuestionIndex];
   const correctAnswer = question.correctAnswer;
-  const isLast        = room.currentQuestionIndex >= room.questions.length - 1;
+  const isLast        = (room.currentQuestionIndex >= room.questions.length - 1) && (room.questions.length > 1);
   const qType         = question.qType || "mcq";
   const isCorrect     = (answer) => {
     if (!answer) return false;
@@ -85,10 +85,14 @@ function endQuestion(roomCode) {
 
   // Score calculation
   const roundResults = {};
+  const baseLimit = question.timeLimit + (isLast ? 3 : 0);
   Object.entries(room.players).forEach(([id, player]) => {
     let pointsEarned = 0;
     if (player.hasAnswered && isCorrect(player.answer)) {
-      pointsEarned = Math.round(1000 * (player.timeLeft / question.timeLimit));
+      pointsEarned = Math.round(1000 * (player.timeLeft / baseLimit));
+      if (isLast) {
+        pointsEarned *= 2; // Double points rewarded for the last question!
+      }
       player.score += pointsEarned;
     }
     roundResults[id] = {
@@ -155,13 +159,16 @@ function startQuestion(roomCode) {
 
   const qi       = room.currentQuestionIndex;
   const question = room.questions[qi];
+  if (!question) return;
+  const isLast   = (qi === room.questions.length - 1) && (room.questions.length > 1);
+  const extraTime = isLast ? 3 : 0;
 
   Object.values(room.players).forEach(p => {
     p.hasAnswered = false; p.answer = null; p.timeLeft = null;
   });
 
   room.state         = "question";
-  room.timeRemaining = question.timeLimit;
+  room.timeRemaining = question.timeLimit + extraTime;
 
   const qType   = question.qType || "mcq";
 
@@ -184,7 +191,7 @@ function startQuestion(roomCode) {
     totalQuestions: room.questions.length,
     text:           question.text,
     options,          // shuffled: MCQ options OR reorder items scrambled for player
-    timeLimit:      question.timeLimit,
+    timeLimit:      question.timeLimit + extraTime,
     imageUrl:       imgUrl,
     qType,
     // NOTE: correctOrder is NOT sent here — it would reveal the answer.
@@ -204,11 +211,13 @@ io.on("connection", socket => {
   console.log("+ connected:", socket.id);
 
   // HOST: create room
-  socket.on("create_room", ({ hostName, questions }) => {
+  socket.on("create_room", ({ hostName, questions, category, customCategory }) => {
     const roomCode = generateCode();
     rooms[roomCode] = {
       hostId: socket.id, hostName,
       players: {}, questions: questions || [],
+      category: category || "Endless",
+      customCategory: customCategory || "",
       currentQuestionIndex: 0, state: "lobby",
       timeRemaining: 0,
       questionTimer: null, phaseTimeout: null, countdownTimer: null,
@@ -217,7 +226,7 @@ io.on("connection", socket => {
     socket.roomCode = roomCode;
     socket.isHost   = true;
     socket.emit("room_created", { roomCode });
-    console.log(`Room ${roomCode} created by ${hostName}`);
+    console.log(`Room ${roomCode} created by ${hostName} (Category: ${category})`);
   });
 
   // HOST: upload image for a specific question
@@ -237,19 +246,19 @@ io.on("connection", socket => {
   });
 
   // PLAYER: join room
-  socket.on("join_room", ({ roomCode, playerName }) => {
+  socket.on("join_room", ({ roomCode, playerName, avatarIndex }) => {
     const room = rooms[roomCode];
     if (!room) { socket.emit("error", { message: "Room not found. Check your code." }); return; }
     if (room.state !== "lobby") { socket.emit("error", { message: "Game already started." }); return; }
 
-    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null };
+    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null, avatarIndex };
     socket.join(roomCode);
     socket.roomCode = roomCode;
 
-    const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score }));
-    io.to(roomCode).emit("player_joined", { players: playerList });
-    socket.emit("join_success", { roomCode, playerName });
-    console.log(`${playerName} joined ${roomCode}`);
+    const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score, avatarIndex: p.avatarIndex }));
+    io.to(roomCode).emit("player_joined", { players: playerList, newPlayerName: playerName });
+    socket.emit("join_success", { roomCode, playerName, category: room.category, customCategory: room.customCategory, avatarIndex });
+    console.log(`${playerName} joined ${roomCode} with avatar ${avatarIndex}`);
   });
 
   // HOST: start quiz
@@ -284,6 +293,18 @@ io.on("connection", socket => {
     if (allAnswered) endQuestion(roomCode);
   });
 
+  // PLAYER: update avatar
+  socket.on("update_avatar", ({ roomCode, avatarIndex }) => {
+    const room = rooms[roomCode];
+    if (!room) return;
+    const player = room.players[socket.id];
+    if (!player) return;
+    player.avatarIndex = avatarIndex;
+    const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score, avatarIndex: p.avatarIndex }));
+    io.to(roomCode).emit("player_joined", { players: playerList });
+    console.log(`Player ${player.name} updated avatar to ${avatarIndex} in room ${roomCode}`);
+  });
+
   // Disconnect
   socket.on("disconnect", () => {
     const roomCode = socket.roomCode;
@@ -297,7 +318,7 @@ io.on("connection", socket => {
       delete rooms[roomCode];
     } else {
       delete room.players[socket.id];
-      const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score }));
+      const playerList = Object.entries(room.players).map(([id, p]) => ({ id, name: p.name, score: p.score, avatarIndex: p.avatarIndex }));
       io.to(roomCode).emit("player_joined", { players: playerList });
     }
     console.log(`- disconnected: ${socket.id} from ${roomCode}`);
