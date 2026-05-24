@@ -2,7 +2,21 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { io } from "socket.io-client";
 
 // Auto-detect server URL — supports custom production URL via environment variables
-const SERVER_URL = process.env.REACT_APP_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
+const getSanitizedServerUrl = () => {
+  let rawUrl = process.env.REACT_APP_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
+  if (rawUrl) {
+    rawUrl = rawUrl.trim();
+    // If the configured URL is missing http:// or https:// prefix, auto-prepend it
+    if (!/^https?:\/\//i.test(rawUrl)) {
+      const isLocal = rawUrl.includes("localhost") || rawUrl.includes("127.0.0.1") || rawUrl.includes("192.168.");
+      rawUrl = `${isLocal ? "http" : "https"}://${rawUrl}`;
+    }
+    // Remove trailing slash to prevent double slashes during concatenation
+    rawUrl = rawUrl.replace(/\/$/, "");
+  }
+  return rawUrl;
+};
+const SERVER_URL = getSanitizedServerUrl();
 
 (() => {
   const l = document.createElement("link");
