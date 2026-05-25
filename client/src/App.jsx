@@ -866,7 +866,11 @@ function ImgUp({ value, onChange }) {
       alert("Please upload a PNG, JPG, GIF, or WEBP image."); return;
     }
     const r = new FileReader();
-    r.onload = ev => onChange(ev.target.result);
+    r.onload = ev => {
+      compressImage(ev.target.result).then(compressed => {
+        onChange(compressed);
+      });
+    };
     r.readAsDataURL(file);
   }
   return (
@@ -923,7 +927,11 @@ function ThemeImgUploader({ value, onChange }) {
       alert("Please upload a PNG, JPG, GIF, or WEBP image."); return;
     }
     const r = new FileReader();
-    r.onload = ev => onChange(ev.target.result);
+    r.onload = ev => {
+      compressImage(ev.target.result).then(compressed => {
+        onChange(compressed);
+      });
+    };
     r.readAsDataURL(file);
   }
   return (
