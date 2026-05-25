@@ -1571,6 +1571,7 @@ export default function App() {
   const [showDoublePointsAnim, setShowDoublePointsAnim] = useState(false);
   const [myAvatarIdx, setMyAvatarIdx] = useState(0);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
 
   const selectAvatar = (idx) => {
     setMyAvatarIdx(idx);
@@ -1778,6 +1779,79 @@ export default function App() {
   function updQ(i, f, v) { setQuestions(qs => qs.map((q, ix) => ix === i ? { ...q, [f]: v } : q)); }
   function addQ() { setQuestions(qs => [...qs, { text: "", correctAnswer: "", incorrectAnswers: ["", "", ""], timeLimit: 10, image: "", qType: "mcq", reorderItems: ["", "", "", ""] }]); }
 
+  function doSaveQuiz() {
+    const name = window.prompt("Enter a name to save this quiz:", quizTitle || "");
+    if (!name || !name.trim()) return;
+    const quizName = name.trim();
+
+    let savedQuizzes = [];
+    try {
+      const savedStr = localStorage.getItem("endplays_saved_quizzes");
+      if (savedStr) savedQuizzes = JSON.parse(savedStr);
+    } catch (e) {
+      console.warn("Failed to load saved quizzes from localStorage", e);
+    }
+
+    const existingIdx = savedQuizzes.findIndex(q => q.name.toLowerCase() === quizName.toLowerCase());
+    if (existingIdx !== -1) {
+      if (!window.confirm(`A quiz named "${quizName}" already exists. Do you want to overwrite it?`)) {
+        return;
+      }
+    }
+
+    const quizData = {
+      name: quizName,
+      quizTitle: quizTitle.trim(),
+      category,
+      customCategory: customCategory.trim(),
+      themeImage,
+      questions,
+      savedAt: Date.now(),
+    };
+
+    if (existingIdx !== -1) {
+      savedQuizzes[existingIdx] = quizData;
+    } else {
+      savedQuizzes.push(quizData);
+    }
+
+    try {
+      localStorage.setItem("endplays_saved_quizzes", JSON.stringify(savedQuizzes));
+      alert(`Quiz "${quizName}" saved successfully!`);
+    } catch (e) {
+      alert("Failed to save quiz. Local storage may be full.");
+      console.error(e);
+    }
+  }
+
+  function doLoadQuiz(savedQuiz) {
+    setQuizTitle(savedQuiz.quizTitle || "");
+    setCategory(savedQuiz.category || "Endless");
+    setCustomCategory(savedQuiz.customCategory || "");
+    setThemeImage(savedQuiz.themeImage || "");
+    if (savedQuiz.questions && savedQuiz.questions.length > 0) {
+      setQuestions(JSON.parse(JSON.stringify(savedQuiz.questions)));
+    } else {
+      setQuestions([{ text: "", correctAnswer: "", incorrectAnswers: ["", "", ""], timeLimit: 10, image: "", qType: "mcq", reorderItems: ["", "", "", ""] }]);
+    }
+    setShowLoadModal(false);
+    setScreen("host-setup");
+  }
+
+  function doDeleteQuiz(quizName) {
+    if (!window.confirm(`Are you sure you want to delete the quiz "${quizName}"?`)) return;
+    try {
+      const savedStr = localStorage.getItem("endplays_saved_quizzes");
+      if (savedStr) {
+        let savedQuizzes = JSON.parse(savedStr);
+        savedQuizzes = savedQuizzes.filter(q => q.name !== quizName);
+        localStorage.setItem("endplays_saved_quizzes", JSON.stringify(savedQuizzes));
+      }
+    } catch (e) {
+      console.error("Failed to delete quiz", e);
+    }
+  }
+
   async function doCreate() {
     if (!hostName.trim()) { showErr("Enter your name"); return; }
     if (!validateQs()) return;
@@ -1932,6 +2006,10 @@ export default function App() {
             <span className="btn-text-long">Join Game</span>
             <span className="btn-text-short">Join</span>
           </Btn>
+          <Btn v="outline" full={false} style={{ color: C.purple, border: `2px solid ${C.purple}` }} sz="sm" onClick={() => setShowLoadModal(true)}>
+            <span className="btn-text-long">Load Saved Quiz</span>
+            <span className="btn-text-short">Load</span>
+          </Btn>
           <Btn v="primary" full={false} sz="sm" onClick={() => setScreen("host-setup")}>
             <span className="btn-text-long">Host a Quiz</span>
             <span className="btn-text-short">Host</span>
@@ -2039,7 +2117,7 @@ export default function App() {
           <div style={{ color: "rgba(255,255,255,.8)", fontWeight: 400, fontSize: 16, marginBottom: 32 }}>
             Build it in minutes. Play with anyone, anywhere.
           </div>
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
             <button className="btn-h"
               onClick={() => setScreen("host-setup")}
               style={{
@@ -2051,10 +2129,114 @@ export default function App() {
               }}>
               Create a Quiz
             </button>
+            <button className="btn-h"
+              onClick={() => setShowLoadModal(true)}
+              style={{
+                padding: "16px 48px", borderRadius: 16, background: "rgba(255,255,255,0.15)", color: "#fff",
+                border: "2px solid rgba(255,255,255,0.4)", fontSize: 18, fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 6px 24px rgba(0,0,0,.1)",
+                transition: "all .2s ease",
+                display: "inline-block"
+              }}>
+              Load Saved Quiz
+            </button>
           </div>
         </GCard>
       </div>
       <Footer />
+      {showLoadModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 99999,
+          background: "rgba(10,8,22,0.85)", display: "flex",
+          alignItems: "center", justifyContent: "center", padding: 20,
+          backdropFilter: "blur(8px)"
+        }}>
+          <div className="pop" style={{
+            background: C.white, borderRadius: 24, padding: "28px 24px",
+            width: "100%", maxWidth: 500, border: `2px solid ${C.purple}22`,
+            boxShadow: "0 20px 40px rgba(124,92,250,0.15)",
+            animation: "popIn .3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <span style={{ fontFamily: "'Fredoka',sans-serif", fontSize: 22, fontWeight: 700, color: C.navy }}>
+                Load Saved Quiz
+              </span>
+              <button
+                onClick={() => setShowLoadModal(false)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: 20, color: C.muted, fontWeight: 600,
+                  padding: 4, display: "flex", alignItems: "center", justifyContent: "center"
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div style={{ maxHeight: 340, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, padding: "4px 2px" }}>
+              {(() => {
+                let quizzes = [];
+                try {
+                  const savedStr = localStorage.getItem("endplays_saved_quizzes");
+                  if (savedStr) quizzes = JSON.parse(savedStr);
+                } catch (e) {
+                  console.error(e);
+                }
+                
+                if (quizzes.length === 0) {
+                  return (
+                    <div style={{ textAlign: "center", padding: "40px 10px", color: C.muted }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>📂</div>
+                      <div style={{ fontWeight: 600, fontSize: 16 }}>No Saved Quizzes Found</div>
+                      <div style={{ fontSize: 13, marginTop: 4 }}>Quizzes you save while hosting will appear here.</div>
+                    </div>
+                  );
+                }
+                
+                return quizzes.map((q, idx) => (
+                  <div key={idx} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                    padding: "14px 16px", borderRadius: 14, border: `1.5px solid ${C.border}`,
+                    background: "#fafaff", transition: "all 0.2s"
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: C.navy, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                        {q.name}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: C.purple, background: `${C.purple}14`, borderRadius: 12, padding: "2px 8px" }}>
+                          {q.questions?.length || 0} Qs
+                        </span>
+                        <span style={{ fontSize: 12, color: C.muted }}>
+                          Saved {new Date(q.savedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                      <Btn sz="sm" full={false} onClick={() => doLoadQuiz(q)}>
+                        Load
+                      </Btn>
+                      <button 
+                        onClick={() => { doDeleteQuiz(q.name); setShowLoadModal(false); setTimeout(() => setShowLoadModal(true), 50); }}
+                        style={{
+                          background: "#fff0f0", border: "1.5px solid #fca5a5", color: "#e53e3e",
+                          borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                          transition: "all 0.15s ease"
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "#fff0f0"; }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -2162,6 +2344,9 @@ export default function App() {
         <div style={{ display: "flex", gap: 14, marginTop: 24, flexWrap: "wrap" }}>
           <Btn v="outline" full={false} style={{ flex: 1, minWidth: 160 }} onClick={addQ}>
             + Add Question
+          </Btn>
+          <Btn v="outline" full={false} style={{ flex: 1, minWidth: 160, border: `2px solid ${C.purple}`, color: C.purple }} onClick={doSaveQuiz}>
+            Save Quiz
           </Btn>
           <Btn full={false} style={{ flex: 2, minWidth: 200 }} sz="lg" onClick={doCreate}>
             Create Room ({questions.length} question{questions.length !== 1 ? "s" : ""})
