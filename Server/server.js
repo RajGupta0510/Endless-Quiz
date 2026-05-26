@@ -273,7 +273,23 @@ io.on("connection", socket => {
     if (!room) { socket.emit("error", { message: "Room not found. Check your code." }); return; }
     if (room.state !== "lobby") { socket.emit("error", { message: "Game already started." }); return; }
 
-    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null, avatarIndex, totalAnswerTime: 0 };
+    // Assign a unique random avatar to the player
+    const TOTAL_AVATARS = 12;
+    const usedIndices = Object.values(room.players).map(p => p.avatarIndex);
+    const freeIndices = [];
+    for (let i = 0; i < TOTAL_AVATARS; i++) {
+      if (!usedIndices.includes(i)) {
+        freeIndices.push(i);
+      }
+    }
+    let chosenIndex;
+    if (freeIndices.length > 0) {
+      chosenIndex = freeIndices[Math.floor(Math.random() * freeIndices.length)];
+    } else {
+      chosenIndex = Math.floor(Math.random() * TOTAL_AVATARS);
+    }
+
+    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null, avatarIndex: chosenIndex, totalAnswerTime: 0 };
     socket.join(roomCode);
     socket.roomCode = roomCode;
 
@@ -284,10 +300,10 @@ io.on("connection", socket => {
       playerName,
       category: room.category,
       customCategory: room.customCategory,
-      avatarIndex,
+      avatarIndex: chosenIndex,
       themeImageUrl: imageStore[`${roomCode}_theme`] ? `/img/${roomCode}/theme` : null
     });
-    console.log(`${playerName} joined ${roomCode} with avatar ${avatarIndex}`);
+    console.log(`${playerName} joined ${roomCode} with avatar ${chosenIndex}`);
   });
 
   // HOST: start quiz

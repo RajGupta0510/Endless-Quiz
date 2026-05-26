@@ -450,6 +450,13 @@ const gcss = `
   @keyframes pulse  {0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
   @keyframes float  {0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-18px) rotate(6deg)}}
   @keyframes glow   {0%,100%{box-shadow:0 0 12px #7C5CFA44}50%{box-shadow:0 0 28px #7C5CFA88}}
+  @keyframes floatPts {
+    0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 3px rgba(46, 201, 122, 0.4)); }
+    50% { transform: translateY(-3px); filter: drop-shadow(0 0 9px rgba(46, 201, 122, 0.7)); }
+  }
+  .pts-float {
+    animation: floatPts 1.5s ease-in-out infinite;
+  }
   @keyframes scoreUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   @keyframes revealOpt{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
   @keyframes floatUp {0%{transform:translateY(0) rotate(0deg);opacity:0}10%{opacity:0.12}90%{opacity:0.12}100%{transform:translateY(-110vh) rotate(360deg);opacity:0}}
@@ -1466,71 +1473,151 @@ function ReorderPlayer({ items, correctOrder, lockedAns, revealed, qResult, onSu
 
 // ── Animated leaderboard row ───────────────────────────────────────────────────
 // Reveals rank 1 first (idx=0), then 2, 3... each 120ms apart (ascending-to-descending)
-function LbRow({ p, myName, idx, showScore = true }) {
+function LbRow({ p, myName, idx, qResult, prevRank, showScore = true }) {
   const isMe = p.name === myName;
   const medals = ["🥇", "🥈", "🥉"];
   const [visible, setVisible] = useState(false);
   const [scoreShown, setScoreShown] = useState(false);
-  const [scoreVal, setScoreVal] = useState(0);
 
+  // Resolve round results and points earned
+  const roundRes = qResult?.results?.[p.id] || Object.values(qResult?.results || {}).find(r => r.name === p.name);
+  const pointsEarned = roundRes ? roundRes.pointsEarned : 0;
+  const prevScore = Math.max(0, Math.round((p.score - pointsEarned) * 10) / 10);
+  const newScore = p.score;
+
+  const [scoreVal, setScoreVal] = useState(prevScore);
+  const [showPoints, setShowPoints] = useState(pointsEarned > 0);
+
+  const newRank = p.rank;
+  const [rankVal, setRankVal] = useState(prevRank);
+
+  // Trigger row staggering and score entry
   useEffect(() => {
-    // Row slides in staggered by rank (rank 1 = idx 0 = first in)
     const t1 = setTimeout(() => setVisible(true), idx * 150);
-    // Score fades in 350ms after the row appears
     const t2 = setTimeout(() => setScoreShown(true), idx * 150 + 350);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [idx]);
 
-  // Count score up from 0 once it becomes visible
+  // Synchronize internal states if they change externally (e.g. on subsequent rounds)
+  useEffect(() => {
+    setScoreVal(prevScore);
+    setShowPoints(pointsEarned > 0);
+    setRankVal(prevRank);
+  }, [p.id, p.score, prevScore, pointsEarned, prevRank]);
+
+  // Animate: show previous score + badge for 1.2 seconds, then count up and hide badge
   useEffect(() => {
     if (!scoreShown) return;
-    const target = p.score; let cur = 0;
-    const steps = 24, interval = 30;
-    const step = target / steps;
-    const iv = setInterval(() => {
-      cur = Math.min(cur + step, target);
-      setScoreVal(Math.round(cur * 10) / 10);
-      if (cur >= target) clearInterval(iv);
-    }, interval);
-    return () => clearInterval(iv);
-  }, [scoreShown, p.score]);
 
-  const rankColor = p.rank === 1 ? C.yellow : p.rank === 2 ? "#94a3b8" : p.rank === 3 ? "#cd7c2f" : C.muted;
+    if (pointsEarned <= 0) {
+      setScoreVal(newScore);
+      setShowPoints(false);
+      setRankVal(newRank);
+      return;
+    }
+
+    // Reset initial animation state
+    setScoreVal(prevScore);
+    setShowPoints(true);
+    setRankVal(prevRank);
+
+    const scoreTimer = setTimeout(() => {
+      const target = newScore;
+      const start = prevScore;
+      const difference = target - start;
+      if (difference <= 0) {
+        setShowPoints(false);
+        return;
+      }
+
+      const steps = 30;
+      const intervalTime = 30; // ~900ms total
+      const step = difference / steps;
+      let current = start;
+
+      const iv = setInterval(() => {
+        current = Math.min(current + step, target);
+        setScoreVal(Math.round(current * 10) / 10);
+        if (current >= target) {
+          clearInterval(iv);
+          setTimeout(() => {
+            setShowPoints(false);
+          }, 300);
+        }
+      }, intervalTime);
+
+      return () => clearInterval(iv);
+    }, 1200);
+
+    // Change rank value after 2.1 seconds (1.2s wait + 900ms rollup complete)
+    const rankTimer = setTimeout(() => {
+      setRankVal(newRank);
+    }, 2100);
+
+    return () => {
+      clearTimeout(scoreTimer);
+      clearTimeout(rankTimer);
+    };
+  }, [scoreShown, prevScore, newScore, pointsEarned, prevRank, newRank]);
+
+  const rankColor = rankVal === 1 ? C.yellow : rankVal === 2 ? "#94a3b8" : rankVal === 3 ? "#cd7c2f" : C.muted;
 
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, padding: "13px 16px",
       background: isMe ? `${C.purple}0e` : "#fafaff",
       borderRadius: 14,
-      border: `2px solid ${isMe ? C.purple + "55" : p.rank === 1 ? C.yellow + "44" : C.border}`,
+      border: `2px solid ${isMe ? C.purple + "55" : rankVal === 1 ? C.yellow + "44" : C.border}`,
       boxShadow: isMe ? `0 0 0 3px ${C.purple}14,0 4px 14px ${C.purple}18`
-        : p.rank === 1 ? `0 2px 12px ${C.yellow}28` : undefined,
+        : rankVal === 1 ? `0 2px 12px ${C.yellow}28` : undefined,
       opacity: visible ? 1 : 0,
       transform: visible ? "translateX(0)" : "translateX(-22px)",
-      transition: "opacity .35s ease, transform .35s ease",
+      transition: "opacity .35s ease, transform .35s ease, border-color .4s ease, box-shadow .4s ease",
     }}>
       <span style={{
-        fontSize: p.rank <= 3 ? 26 : 15, width: 34, textAlign: "center",
-        fontWeight: 700, color: rankColor
+        fontSize: rankVal <= 3 ? 26 : 15, width: 34, textAlign: "center",
+        fontWeight: 700, color: rankColor,
+        transition: "color 0.4s ease, font-size 0.4s ease"
       }}>
-        {p.rank <= 3 ? medals[p.rank - 1] : `#${p.rank}`}
+        {rankVal <= 3 ? medals[rankVal - 1] : `#${rankVal}`}
       </span>
       <Av name={p.name} size={36} avatarIndex={p.avatarIndex} />
       <span style={{ flex: 1, fontWeight: 600, fontSize: 16, color: isMe ? C.purple : C.navy }}>
         {p.name}{isMe ? " (you)" : ""}
       </span>
       {showScore && (
-        <span style={{
-          fontWeight: 700, fontSize: 22,
-          color: p.rank === 1 ? C.yellow : C.navy,
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
           opacity: scoreShown ? 1 : 0,
           transform: scoreShown ? "translateY(0)" : "translateY(8px)",
           transition: "opacity .4s ease, transform .4s ease",
-          display: "inline-block", minWidth: 60, textAlign: "right",
-          fontVariantNumeric: "tabular-nums"
         }}>
-          {scoreShown ? scoreVal.toLocaleString() : ""}
-        </span>
+          <span style={{
+            fontWeight: 700, fontSize: 22,
+            color: rankVal === 1 ? C.yellow : C.navy,
+            fontVariantNumeric: "tabular-nums",
+            textAlign: "right",
+            minWidth: 50
+          }}>
+            {scoreShown ? scoreVal.toLocaleString() : ""}
+          </span>
+          {showPoints && pointsEarned > 0 && (
+            <span className="pts-float" style={{
+              fontWeight: 700, fontSize: 15,
+              color: C.green,
+              background: `${C.green}18`,
+              border: `1.5px solid ${C.green}33`,
+              borderRadius: 8,
+              padding: "2px 8px",
+              boxShadow: `0 0 10px ${C.green}44`,
+              transition: "opacity 0.3s ease, transform 0.3s ease",
+            }}>
+              +{pointsEarned.toLocaleString()}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1580,6 +1667,46 @@ export default function App() {
   const [myAvatarIdx, setMyAvatarIdx] = useState(0);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
+
+  const [useNewStandings, setUseNewStandings] = useState(false);
+
+  useEffect(() => {
+    if (gameState !== "leaderboard" && screen !== "finished") {
+      setUseNewStandings(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      setUseNewStandings(true);
+    }, 2100);
+    return () => clearTimeout(t);
+  }, [gameState, screen]);
+
+  const getPlayerPrevScore = useCallback((player) => {
+    const roundRes = qResult?.results?.[player.id] || Object.values(qResult?.results || {}).find(r => r.name === player.name);
+    const points = roundRes ? roundRes.pointsEarned : 0;
+    return Math.max(0, Math.round((player.score - points) * 10) / 10);
+  }, [qResult]);
+
+  const prevRankedLeaderboard = useMemo(() => {
+    return [...leaderboard].sort((a, b) => {
+      const prevA = getPlayerPrevScore(a);
+      const prevB = getPlayerPrevScore(b);
+      if (prevB !== prevA) return prevB - prevA;
+      return a.name.localeCompare(b.name);
+    });
+  }, [leaderboard, getPlayerPrevScore]);
+
+  const getPlayerPrevRank = useCallback((playerId) => {
+    return prevRankedLeaderboard.findIndex(p => p.id === playerId) + 1;
+  }, [prevRankedLeaderboard]);
+
+  const displayedLeaderboard = useMemo(() => {
+    if (useNewStandings) {
+      return leaderboard;
+    } else {
+      return prevRankedLeaderboard;
+    }
+  }, [leaderboard, useNewStandings, prevRankedLeaderboard]);
 
   const selectAvatar = (idx) => {
     setMyAvatarIdx(idx);
@@ -1895,7 +2022,7 @@ export default function App() {
     if (joinCode.trim().length < 4) { showErr("Enter the room code"); return; }
     const s = setupSocket(); setRole("player");
     setMyName(playerName.trim()); myNameRef.current = playerName.trim();
-    const autoIdx = playerName.trim() ? (playerName.trim().charCodeAt(0) + playerName.trim().length) % AVATARS.length : 0;
+    const autoIdx = Math.floor(Math.random() * AVATARS.length);
     setMyAvatarIdx(autoIdx);
     s.emit("join_room", { roomCode: joinCode.toUpperCase().trim(), playerName: playerName.trim(), avatarIndex: autoIdx });
   }
@@ -3035,8 +3162,8 @@ export default function App() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {leaderboard.map((p, i) => (
-                  <LbRow key={p.id} p={p} myName={myName} idx={i} />
+                {displayedLeaderboard.map((p, i) => (
+                  <LbRow key={p.id} p={p} myName={myName} idx={i} qResult={qResult} prevRank={getPlayerPrevRank(p.id)} />
                 ))}
               </div>
 
@@ -3121,8 +3248,8 @@ export default function App() {
           <Card>
             <GT size={26} style={{ display: "block", marginBottom: 18 }}>Final Standings</GT>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {leaderboard.map((p, i) => (
-                <LbRow key={p.id} p={p} myName={myName} idx={i} />
+              {displayedLeaderboard.map((p, i) => (
+                <LbRow key={p.id} p={p} myName={myName} idx={i} qResult={qResult} prevRank={getPlayerPrevRank(p.id)} />
               ))}
             </div>
           </Card>
