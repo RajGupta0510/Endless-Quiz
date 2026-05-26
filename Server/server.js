@@ -39,8 +39,19 @@ function generateCode() {
 
 function getLeaderboard(room) {
   return Object.entries(room.players)
-    .map(([id, p]) => ({ id, name: p.name, score: p.score, avatarIndex: p.avatarIndex }))
-    .sort((a, b) => b.score - a.score)
+    .map(([id, p]) => ({
+      id,
+      name: p.name,
+      score: p.score,
+      avatarIndex: p.avatarIndex,
+      totalAnswerTime: p.totalAnswerTime || 0
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return a.totalAnswerTime - b.totalAnswerTime;
+    })
     .map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
@@ -88,12 +99,22 @@ function endQuestion(roomCode) {
   const baseLimit = question.timeLimit + (isLast ? 3 : 0);
   Object.entries(room.players).forEach(([id, player]) => {
     let pointsEarned = 0;
+    let elapsed = player.hasAnswered ? (player.elapsedMs || 0) : (baseLimit * 1000);
+
+    // Accumulate total answer time
+    player.totalAnswerTime = (player.totalAnswerTime || 0) + elapsed;
+
     if (player.hasAnswered && isCorrect(player.answer)) {
-      pointsEarned = Math.round(1000 * (player.timeLeft / baseLimit));
-      if (isLast) {
-        pointsEarned *= 2; // Double points rewarded for the last question!
-      }
+      const basePoints = isLast ? 2000 : 1000;
+      const totalTimeLimitMs = baseLimit * 1000;
+      const decayRatePerMs = basePoints / totalTimeLimitMs;
+
+      pointsEarned = basePoints - (player.elapsedMs * decayRatePerMs);
+      pointsEarned = Math.max(0, pointsEarned);
+      pointsEarned = Math.round(pointsEarned * 10) / 10; // Round to 1 decimal place
+
       player.score += pointsEarned;
+      player.score = Math.round(player.score * 10) / 10; // Avoid float inaccuracies
     }
     roundResults[id] = {
       name: player.name, answer: player.answer,
@@ -169,6 +190,7 @@ function startQuestion(roomCode) {
 
   room.state         = "question";
   room.timeRemaining = question.timeLimit + extraTime;
+  room.questionStartTime = Date.now();
 
   const qType   = question.qType || "mcq";
 
@@ -251,7 +273,7 @@ io.on("connection", socket => {
     if (!room) { socket.emit("error", { message: "Room not found. Check your code." }); return; }
     if (room.state !== "lobby") { socket.emit("error", { message: "Game already started." }); return; }
 
-    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null, avatarIndex };
+    room.players[socket.id] = { name: playerName, score: 0, hasAnswered: false, answer: null, timeLeft: null, avatarIndex, totalAnswerTime: 0 };
     socket.join(roomCode);
     socket.roomCode = roomCode;
 
@@ -277,13 +299,13 @@ io.on("connection", socket => {
     }
     room.state = "playing";
     room.currentQuestionIndex = 0;
-    Object.values(room.players).forEach(p => { p.score = 0; });
+    Object.values(room.players).forEach(p => { p.score = 0; p.totalAnswerTime = 0; });
     io.to(roomCode).emit("quiz_started", { totalQuestions: room.questions.length });
     setTimeout(() => startQuestion(roomCode), 1500);
   });
 
   // PLAYER: submit answer
-  socket.on("submit_answer", ({ roomCode, answer }) => {
+  socket.on("submit_answer", ({ roomCode, answer, elapsedMs }) => {
     const room = rooms[roomCode];
     if (!room) return;
     const player = room.players[socket.id];
@@ -292,6 +314,16 @@ io.on("connection", socket => {
     player.hasAnswered = true;
     player.answer      = answer;
     player.timeLeft    = room.timeRemaining;
+
+    // Secure timing validation
+    const serverElapsedMs = Date.now() - room.questionStartTime;
+    let finalElapsedMs = typeof elapsedMs === "number" && elapsedMs >= 0 ? elapsedMs : serverElapsedMs;
+
+    const minPossibleElapsed = serverElapsedMs - 300; // 300ms network buffer
+    if (finalElapsedMs < minPossibleElapsed) {
+      finalElapsedMs = serverElapsedMs;
+    }
+    player.elapsedMs = finalElapsedMs;
 
     socket.emit("answer_locked", { answer, timeLeft: room.timeRemaining });
 

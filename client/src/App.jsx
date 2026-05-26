@@ -1485,11 +1485,11 @@ function LbRow({ p, myName, idx, showScore = true }) {
   useEffect(() => {
     if (!scoreShown) return;
     const target = p.score; let cur = 0;
-    const steps = Math.min(target, 24), interval = 30;
-    const step = Math.ceil(target / steps);
+    const steps = 24, interval = 30;
+    const step = target / steps;
     const iv = setInterval(() => {
       cur = Math.min(cur + step, target);
-      setScoreVal(cur);
+      setScoreVal(Math.round(cur * 10) / 10);
       if (cur >= target) clearInterval(iv);
     }, interval);
     return () => clearInterval(iv);
@@ -1590,6 +1590,7 @@ export default function App() {
   };
 
   const socketRef = useRef(null);
+  const questionStartRef = useRef(null);
   const [codeCopied, copyCode] = useCopy();
   const [linkCopied, copyLink] = useCopy();
 
@@ -1696,6 +1697,9 @@ export default function App() {
       setPtsEarned(0);
       setTypedInput("");
       setNextCdSecs(null);
+
+      // Record high-precision question display start time
+      questionStartRef.current = performance.now();
 
       // Typewriter and Double Points overlay triggers
       setIsTyping(true);
@@ -1897,7 +1901,8 @@ export default function App() {
   }
   function doAnswer(ans) {
     if (lockedAns || revealed) return;
-    socketRef.current?.emit("submit_answer", { roomCode, answer: ans });
+    const elapsedMs = questionStartRef.current ? (performance.now() - questionStartRef.current) : 0;
+    socketRef.current?.emit("submit_answer", { roomCode, answer: ans, elapsedMs });
   }
   function doPlayAgain() {
     if (socketRef.current) socketRef.current.disconnect();
