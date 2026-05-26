@@ -457,6 +457,57 @@ const gcss = `
   .pts-float {
     animation: floatPts 1.5s ease-in-out infinite;
   }
+  @keyframes revealPodium {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .podium-step {
+    animation: revealPodium 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes spotlightPulse {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(251,191,36,0.3), inset 0 0 10px rgba(251,191,36,0.1);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(251,191,36,0.8), inset 0 0 20px rgba(251,191,36,0.4);
+      filter: brightness(1.1);
+    }
+  }
+  .spotlight-active {
+    animation: spotlightPulse 2s ease-in-out infinite;
+  }
+  @keyframes celebrateRotate {
+    0% { transform: translate(-50%, 0) rotate(0deg) scale(1); }
+    50% { transform: translate(-50%, -4px) rotate(10deg) scale(1.1); }
+    100% { transform: translate(-50%, 0) rotate(0deg) scale(1); }
+  }
+  .crown-celebrate {
+    animation: celebrateRotate 1.2s ease-in-out infinite;
+  }
+  @keyframes confettiFloat {
+    0% {
+      opacity: 0;
+      transform: translateY(0) rotate(0deg) scale(0.5);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(-80px) rotate(45deg) scale(1.1);
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-380px) rotate(270deg) scale(0.8);
+    }
+  }
   @keyframes scoreUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   @keyframes revealOpt{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
   @keyframes floatUp {0%{transform:translateY(0) rotate(0deg);opacity:0}10%{opacity:0.12}90%{opacity:0.12}100%{transform:translateY(-110vh) rotate(360deg);opacity:0}}
@@ -1623,6 +1674,37 @@ function LbRow({ p, myName, idx, qResult, prevRank, showScore = true }) {
   );
 }
 
+// ── Confetti Celebration Shower ───────────────────────────────────────────────
+function ConfettiShower() {
+  const particles = useMemo(() => {
+    const emojis = ["⭐", "✨", "👑", "🎉", "🎈", "💖"];
+    return Array.from({ length: 40 }).map((_, i) => ({
+      emoji: emojis[i % emojis.length],
+      left: `${15 + Math.random() * 70}%`, // Distributed around the podium area
+      delay: Math.random() * 2.5,
+      duration: 2.5 + Math.random() * 2,
+      size: 18 + Math.random() * 22,
+    }));
+  }, []);
+
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 10 }}>
+      {particles.map((p, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          bottom: 120,
+          left: p.left,
+          fontSize: p.size,
+          opacity: 0,
+          animation: `confettiFloat ${p.duration}s cubic-bezier(0.1, 0.8, 0.3, 1) ${p.delay}s infinite`,
+        }}>
+          {p.emoji}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1670,6 +1752,10 @@ export default function App() {
 
   const [useNewStandings, setUseNewStandings] = useState(false);
 
+  const [revealRank3, setRevealRank3] = useState(false);
+  const [revealRank2, setRevealRank2] = useState(false);
+  const [revealRank1, setRevealRank1] = useState(false);
+
   useEffect(() => {
     if (gameState !== "leaderboard" && screen !== "finished") {
       setUseNewStandings(false);
@@ -1680,6 +1766,23 @@ export default function App() {
     }, 2100);
     return () => clearTimeout(t);
   }, [gameState, screen]);
+
+  useEffect(() => {
+    if (screen !== "finished") {
+      setRevealRank3(false);
+      setRevealRank2(false);
+      setRevealRank1(false);
+      return;
+    }
+    const t3 = setTimeout(() => setRevealRank3(true), 800);
+    const t2 = setTimeout(() => setRevealRank2(true), 2000);
+    const t1 = setTimeout(() => setRevealRank1(true), 3500);
+    return () => {
+      clearTimeout(t3);
+      clearTimeout(t2);
+      clearTimeout(t1);
+    };
+  }, [screen]);
 
   const getPlayerPrevScore = useCallback((player) => {
     const roundRes = qResult?.results?.[player.id] || Object.values(qResult?.results || {}).find(r => r.name === player.name);
@@ -3222,6 +3325,15 @@ export default function App() {
   // ════════════════════════════════════════════════════════════════════════════
   if (screen === "finished") {
     const me = leaderboard.find(p => p.name === myName);
+    
+    // Resolve top 3 players from final leaderboard
+    const r1 = leaderboard.find(p => p.rank === 1);
+    const r2 = leaderboard.find(p => p.rank === 2);
+    const r3 = leaderboard.find(p => p.rank === 3);
+
+    // Remaining players ranked 4th and lower
+    const remainingPlayers = leaderboard.filter(p => p.rank > 3);
+
     return (
       <div style={{
         minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column",
@@ -3233,26 +3345,171 @@ export default function App() {
           gap: 18, position: "relative", zIndex: 1
         }}>
 
-          <GCard cls="pop" style={{ textAlign: "center", padding: "48px 28px" }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <GCard cls="pop" style={{ textAlign: "center", padding: "36px 28px" }}>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
               <Icon.Trophy />
             </div>
-            <div style={{ fontWeight: 700, fontSize: 38, color: "#fff", marginBottom: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 32, color: "#fff", marginBottom: 4 }}>
               {me?.rank === 1 ? "You Won!" : me?.rank === 2 ? "Runner Up!" : me?.rank === 3 ? "Third Place!" : `Rank #${me?.rank}`}
             </div>
-            <div style={{ fontWeight: 700, fontSize: 52, color: "#fef3c7", letterSpacing: ".02em" }}>
+            <div style={{ fontWeight: 700, fontSize: 44, color: "#fef3c7", letterSpacing: ".02em" }}>
               {(me?.score || 0).toLocaleString()} pts
             </div>
           </GCard>
 
-          <Card>
-            <GT size={26} style={{ display: "block", marginBottom: 18 }}>Final Standings</GT>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {displayedLeaderboard.map((p, i) => (
-                <LbRow key={p.id} p={p} myName={myName} idx={i} qResult={qResult} prevRank={getPlayerPrevRank(p.id)} />
-              ))}
-            </div>
-          </Card>
+          {/* Gorgeous Visual Podium Reveal */}
+          <div style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            gap: 12,
+            margin: "24px auto",
+            width: "100%",
+            height: "260px",
+            position: "relative",
+          }}>
+            {/* Confetti Celebration */}
+            {revealRank1 && r1 && <ConfettiShower />}
+
+            {/* Rank 2 Step (Silver) */}
+            {r2 && (
+              <div className="podium-step" style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                opacity: revealRank2 ? 1 : 0,
+                transform: revealRank2 ? "none" : "translateY(40px) scale(0.9)",
+                transition: "opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                pointerEvents: revealRank2 ? "auto" : "none",
+              }}>
+                <div style={{ marginBottom: 6, position: "relative" }}>
+                  <Av name={r2.name} size={54} avatarIndex={r2.avatarIndex} />
+                  <span style={{
+                    position: "absolute", bottom: -4, right: -4,
+                    fontSize: 18, background: "#e2e8f0", borderRadius: "50%",
+                    width: 24, height: 24, display: "flex", alignItems: "center",
+                    justifyContent: "center", border: "1.5px solid #94a3b8"
+                  }}>🥈</span>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: C.navy, textAlign: "center", maxWidth: 85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r2.name}
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 11, color: C.muted, marginBottom: 6 }}>
+                  {r2.score.toLocaleString()}
+                </div>
+                <div style={{
+                  width: "100%", height: "80px",
+                  background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 50%, #94a3b8 100%)",
+                  borderRadius: "14px 14px 8px 8px",
+                  boxShadow: "0 6px 16px rgba(148,163,184,0.2)",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <span style={{ fontWeight: 800, fontSize: 32, color: "#fff", textShadow: "0 2px 4px rgba(0,0,0,0.12)" }}>2nd</span>
+                </div>
+              </div>
+            )}
+
+            {/* Rank 1 Step (Gold) */}
+            {r1 && (
+              <div className="podium-step" style={{
+                flex: 1.15,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                opacity: revealRank1 ? 1 : 0,
+                transform: revealRank1 ? "none" : "translateY(40px) scale(0.9)",
+                transition: "opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                pointerEvents: revealRank1 ? "auto" : "none",
+                zIndex: 5,
+              }}>
+                <div style={{ marginBottom: 6, position: "relative" }}>
+                  {revealRank1 && (
+                    <div className="crown-celebrate" style={{
+                      position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)",
+                      fontSize: 28, filter: "drop-shadow(0 2px 4px rgba(251,191,36,0.4))",
+                      zIndex: 10
+                    }}>👑</div>
+                  )}
+                  <div className={revealRank1 ? "spotlight-active" : ""} style={{ borderRadius: "50%", padding: 2, background: revealRank1 ? "linear-gradient(135deg, #fbbf24, #d97706)" : "transparent" }}>
+                    <Av name={r1.name} size={66} avatarIndex={r1.avatarIndex} />
+                  </div>
+                  <span style={{
+                    position: "absolute", bottom: -4, right: -4,
+                    fontSize: 20, background: "#fef3c7", borderRadius: "50%",
+                    width: 28, height: 28, display: "flex", alignItems: "center",
+                    justifyContent: "center", border: "1.5px solid #fbbf24"
+                  }}>🥇</span>
+                </div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: C.purple, textAlign: "center", maxWidth: 105, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r1.name}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 12, color: C.yellow, marginBottom: 6 }}>
+                  {r1.score.toLocaleString()}
+                </div>
+                <div className={revealRank1 ? "spotlight-active" : ""} style={{
+                  width: "100%", height: "110px",
+                  background: "linear-gradient(135deg, #fef08a 0%, #facc15 50%, #ca8a04 100%)",
+                  borderRadius: "18px 18px 8px 8px",
+                  boxShadow: "0 8px 24px rgba(234,179,8,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <span style={{ fontWeight: 900, fontSize: 40, color: "#fff", textShadow: "0 2px 4px rgba(0,0,0,0.15)" }}>1st</span>
+                </div>
+              </div>
+            )}
+
+            {/* Rank 3 Step (Bronze) */}
+            {r3 && (
+              <div className="podium-step" style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                opacity: revealRank3 ? 1 : 0,
+                transform: revealRank3 ? "none" : "translateY(40px) scale(0.9)",
+                transition: "opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                pointerEvents: revealRank3 ? "auto" : "none",
+              }}>
+                <div style={{ marginBottom: 6, position: "relative" }}>
+                  <Av name={r3.name} size={48} avatarIndex={r3.avatarIndex} />
+                  <span style={{
+                    position: "absolute", bottom: -4, right: -4,
+                    fontSize: 16, background: "#ffedd5", borderRadius: "50%",
+                    width: 22, height: 22, display: "flex", alignItems: "center",
+                    justifyContent: "center", border: "1.5px solid #cd7c2f"
+                  }}>🥉</span>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 12, color: C.navy, textAlign: "center", maxWidth: 75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r3.name}
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 11, color: C.muted, marginBottom: 6 }}>
+                  {r3.score.toLocaleString()}
+                </div>
+                <div style={{
+                  width: "100%", height: "65px",
+                  background: "linear-gradient(135deg, #ffedd5 0%, #fed7aa 50%, #cd7c2f 100%)",
+                  borderRadius: "12px 12px 8px 8px",
+                  boxShadow: "0 5px 12px rgba(205,124,47,0.18)",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <span style={{ fontWeight: 800, fontSize: 26, color: "#fff", textShadow: "0 2px 4px rgba(0,0,0,0.12)" }}>3rd</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Final Standings (Players ranked 4th and lower) */}
+          {remainingPlayers.length > 0 && (
+            <Card>
+              <GT size={22} style={{ display: "block", marginBottom: 14 }}>Final Standings</GT>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {remainingPlayers.map((p, i) => (
+                  <LbRow key={p.id} p={p} myName={myName} idx={i} qResult={qResult} prevRank={getPlayerPrevRank(p.id)} />
+                ))}
+              </div>
+            </Card>
+          )}
 
           <Btn sz="lg" onClick={doPlayAgain}>Play Again</Btn>
           <Btn v="ghost" onClick={doPlayAgain}>Back to Home</Btn>
