@@ -1,33 +1,33 @@
-# 🎮 EndPlays Quiz — Real-Time Multiplayer Quiz Platform
+#  EndPlays Quiz — Real-Time Multiplayer Quiz Platform
 
 EndPlays Quiz is a high-fidelity, real-time multiplayer quiz game platform. Host trivia nights, competitive quizzes, or fun team-building games instantly with zero signups required. Created with an immersive, gamified user experience in mind, EndPlays features beautiful glassmorphic aesthetics, adaptive themes, interactive sound effects (SFX), and text-to-speech question narration.
 
 ---
 
-## ✨ Features
+##  Features
 
-- **⚡ Real-Time Multiplayer Sync**: Powered by `socket.io` for instantaneous synchronization of players, timers, answers, and leaderboards.
-- **🧠 Diverse Question Formats**:
+- ** Real-Time Multiplayer Sync**: Powered by `socket.io` for instantaneous synchronization of players, timers, answers, and leaderboards.
+- ** Diverse Question Formats**:
   - **MCQ (Multiple Choice)**: Standard 4-option trivia with randomized answer ordering.
   - **Reorder**: Scrambled item lists where players reorder sequences correctly.
   - **Typed & Fill in the Blank**: Open-ended questions featuring case-insensitive, trimmed, and white-space-normalized validation.
-- **📈 Gamified Timing & Scoring**:
+- ** Gamified Timing & Scoring**:
   - **Score Decay**: Quicker answers yield higher points (based on exact millisecond reaction times).
   - **Final Round Stakes**: The last question carries double the base points to enable dramatic comebacks.
   - **Live Leaderboard**: Displays scores, response times, ranks, and custom micro-animations.
-- **🖼️ Rich Media Integration**:
+- ** Rich Media Integration**:
   - Supports image attachments for any question.
   - Features **client-side HTML5 Canvas compression** (automatically resizes to a maximum of 800px width at 70% quality JPEG) before uploading via websockets, keeping server memory usage lightweight and networking lightning-fast.
-- **🔊 Oscillator-Based Audio SFX**: Employs the HTML5 Web Audio API to synthesize retro game sound effects (join chime, answer locked, correct/incorrect tones, countdown tick, and final fanfare) without downloading heavy audio assets.
-- **🎙️ Speech Narration**: Integrates the Web Speech API (`SpeechSynthesisUtterance`) to read out questions in real-time as they are typed out on the players' screens.
-- **🎨 Premium Visual Experience**:
+- ** Oscillator-Based Audio SFX**: Employs the HTML5 Web Audio API to synthesize retro game sound effects (join chime, answer locked, correct/incorrect tones, countdown tick, and final fanfare) without downloading heavy audio assets.
+- ** Speech Narration**: Integrates the Web Speech API (`SpeechSynthesisUtterance`) to read out questions in real-time as they are typed out on the players' screens.
+- ** Premium Visual Experience**:
   - Curated HSL-tailored colors, gradients, and a sleek modern typography system (Fredoka).
   - **12 Custom Vector (SVG) Avatars** generated programmatically.
   - **12 Category-Specific Themes**: Adaptive backgrounds with floating emoji particles (Luffa, Geography, Tech, Sports, etc.).
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 - **React (v19)**: Component-driven reactive UI.
@@ -93,7 +93,7 @@ Endplays Quiz/
 
 ---
 
-## ⚙️ Configuration & Environment Setup
+##  Configuration & Environment Setup
 
 Both directories contain `.env.example` templates. Copy these to `.env` files to configure URLs and ports.
 
@@ -117,7 +117,7 @@ PORT=3001
 
 ---
 
-## 🚀 Installation & Local Development
+##  Installation & Local Development
 
 ### 1. Prerequisites
 Make sure you have [Node.js](https://nodejs.org/) installed (recommended version 16+ or LTS).
@@ -151,7 +151,7 @@ The client app will launch automatically at `http://localhost:3000`.
 
 ---
 
-## 📈 Scoring Formula
+##  Scoring Formula
 
 Scores are computed securely on the server side using the formula:
 
@@ -165,7 +165,7 @@ Where:
 
 ---
 
-## 🌐 Production Deployments
+##  Production Deployments
 
 ### Server
 - Deploy to platforms like **Render**, **Railway**, or **Heroku**.
